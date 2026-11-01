@@ -10,10 +10,12 @@ window.MYTENNIS = {
   },
   periodId: "6",
   months12: ["Дек", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя"],
+  /* окно данных: Дек 2024 – Ноя 2026, 24 месяца */
+  start: { y: 2024, m: 11 },
   loc: { "Дек": "в декабре", "Янв": "в январе", "Фев": "в феврале", "Мар": "в марте", "Апр": "в апреле", "Май": "в мае", "Июн": "в июне", "Июл": "в июле", "Авг": "в августе", "Сен": "в сентябре", "Окт": "в октябре", "Ноя": "в ноябре" },
   series: {
-    ntrp: [3.4, 3.4, 3.5, 3.5, 3.5, 3.6, 3.6, 3.7, 3.8, 3.8, 3.9, 4.0],
-    matches: [5, 4, 6, 7, 6, 5, 6, 10, 7, 6, 5, 5]
+    ntrp: [3.0, 3.0, 3.1, 3.1, 3.1, 3.2, 3.2, 3.2, 3.3, 3.3, 3.3, 3.4, 3.4, 3.4, 3.5, 3.5, 3.5, 3.6, 3.6, 3.7, 3.8, 3.8, 3.9, 4.0],
+    matches: [4, 3, 5, 6, 5, 4, 5, 6, 5, 4, 5, 5, 5, 4, 6, 7, 6, 5, 6, 10, 7, 6, 5, 5]
   },
   stats: {
     "3": { ntrpDelta: "0,2", winsDelta: "+4 п.п.", wins: { w: 10, t: 16 }, bars: [75, 70, 58, 56, 45], opp: [{ w: 5, t: 6 }, { w: 3, t: 6 }, { w: 2, t: 4 }], surface: { hard: 66, clay: 50 } },
@@ -33,16 +35,31 @@ window.MYTENNIS = {
     { name: "Сильнее вас", range: "выше 4,5", tone: "danger" }
   ],
   pool: [
-    { name: "Иванов А.", meta: "Лужники, хард", score: "6–4 7–6(5)", date: "30 окт", m: 10, day: 30, result: "win", surface: "hard", strong: false },
-    { name: "Морозов П.", meta: "Спартак, грунт", score: "4–6 6–7(4)", date: "27 окт", m: 10, day: 27, result: "loss", surface: "clay", strong: true },
-    { name: "Петров С.", meta: "Спартак, грунт", score: "3–6 4–6", date: "18 окт", m: 10, day: 18, result: "loss", surface: "clay", strong: false },
-    { name: "Сидоров К.", meta: "Лужники, хард", score: "6–2 6–3", date: "3 окт", m: 10, day: 3, result: "win", surface: "hard", strong: false },
-    { name: "Козлов Д.", meta: "Лужники, хард", score: "4–6 5–7", date: "2 окт", m: 10, day: 2, result: "loss", surface: "hard", strong: false },
-    { name: "Козлов Д.", meta: "Лужники, хард", score: "7–5 6–4", date: "12 сен", m: 9, day: 12, result: "win", surface: "hard", strong: true },
-    { name: "Волков А.", meta: "Спартак, грунт", score: "3–6 2–6", date: "20 авг", m: 8, day: 20, result: "loss", surface: "clay", strong: true },
-    { name: "Лебедев Н.", meta: "Лужники, хард", score: "6–7(3) 4–6", date: "14 июл", m: 7, day: 14, result: "loss", surface: "hard", strong: true },
-    { name: "Орлов Р.", meta: "Спартак, грунт", score: "6–3 3–6 7–6(4)", date: "9 июн", m: 6, day: 9, result: "win", surface: "clay", strong: true },
-    { name: "Беляев М.", meta: "Лужники, хард", score: "5–7 6–4 6–3", date: "22 мар", m: 3, day: 22, result: "win", surface: "hard", strong: true }
+    { name: "Громов И.", meta: "Лужники, хард", score: "6–3 6–4", date: "16 фев", m: 14, day: 16, result: "win", surface: "hard", strong: false },
+    { name: "Фомин Л.", meta: "Спартак, грунт", score: "2–6 4–6", date: "8 янв", m: 13, day: 8, result: "loss", surface: "clay", strong: true },
+    { name: "Крылов В.", meta: "Лужники, хард", score: "7–6(4) 6–4", date: "19 дек", m: 12, day: 19, result: "win", surface: "hard", strong: true },
+    { name: "Егоров Т.", meta: "Спартак, грунт", score: "6–4 6–2", date: "11 апр", m: 16, day: 11, result: "win", surface: "clay", strong: false },
+    { name: "Зайцев О.", meta: "Лужники, хард", score: "4–6 6–3 3–6", date: "27 май", m: 17, day: 27, result: "loss", surface: "hard", strong: true },
+    { name: "Миронов Е.", meta: "Спартак, грунт", score: "6–1 6–3", date: "21 ноя", m: 11, day: 21, result: "win", surface: "clay", strong: false },
+    { name: "Тихонов Г.", meta: "Лужники, хард", score: "3–6 6–7(5)", date: "5 окт", m: 10, day: 5, result: "loss", surface: "hard", strong: true },
+    { name: "Алексеев Д.", meta: "Спартак, грунт", score: "6–4 7–5", date: "14 сен", m: 9, day: 14, result: "win", surface: "clay", strong: false },
+    { name: "Журавлёв С.", meta: "Лужники, хард", score: "6–2 6–4", date: "30 авг", m: 8, day: 30, result: "win", surface: "hard", strong: false },
+    { name: "Попов К.", meta: "Спартак, грунт", score: "5–7 4–6", date: "17 июл", m: 7, day: 17, result: "loss", surface: "clay", strong: true },
+    { name: "Данилов Р.", meta: "Лужники, хард", score: "7–5 6–3", date: "2 июн", m: 6, day: 2, result: "win", surface: "hard", strong: true },
+    { name: "Ершов А.", meta: "Спартак, грунт", score: "6–3 6–4", date: "23 май", m: 5, day: 23, result: "win", surface: "clay", strong: false },
+    { name: "Носов М.", meta: "Лужники, хард", score: "2–6 3–6", date: "9 апр", m: 4, day: 9, result: "loss", surface: "hard", strong: true },
+    { name: "Руднев П.", meta: "Лужники, хард", score: "6–4 6–4", date: "26 фев", m: 2, day: 26, result: "win", surface: "hard", strong: false },
+    { name: "Макаров Ю.", meta: "Спартак, грунт", score: "6–7(2) 3–6", date: "12 янв", m: 1, day: 12, result: "loss", surface: "clay", strong: true },
+    { name: "Иванов А.", meta: "Лужники, хард", score: "6–4 7–6(5)", date: "30 окт", m: 22, day: 30, result: "win", surface: "hard", strong: false },
+    { name: "Морозов П.", meta: "Спартак, грунт", score: "4–6 6–7(4)", date: "27 окт", m: 22, day: 27, result: "loss", surface: "clay", strong: true },
+    { name: "Петров С.", meta: "Спартак, грунт", score: "3–6 4–6", date: "18 окт", m: 22, day: 18, result: "loss", surface: "clay", strong: false },
+    { name: "Сидоров К.", meta: "Лужники, хард", score: "6–2 6–3", date: "3 окт", m: 22, day: 3, result: "win", surface: "hard", strong: false },
+    { name: "Козлов Д.", meta: "Лужники, хард", score: "4–6 5–7", date: "2 окт", m: 22, day: 2, result: "loss", surface: "hard", strong: false },
+    { name: "Козлов Д.", meta: "Лужники, хард", score: "7–5 6–4", date: "12 сен", m: 21, day: 12, result: "win", surface: "hard", strong: true },
+    { name: "Волков А.", meta: "Спартак, грунт", score: "3–6 2–6", date: "20 авг", m: 20, day: 20, result: "loss", surface: "clay", strong: true },
+    { name: "Лебедев Н.", meta: "Лужники, хард", score: "6–7(3) 4–6", date: "14 июл", m: 19, day: 14, result: "loss", surface: "hard", strong: true },
+    { name: "Орлов Р.", meta: "Спартак, грунт", score: "6–3 3–6 7–6(4)", date: "9 июн", m: 18, day: 9, result: "win", surface: "clay", strong: true },
+    { name: "Беляев М.", meta: "Лужники, хард", score: "5–7 6–4 6–3", date: "22 мар", m: 15, day: 22, result: "win", surface: "hard", strong: true }
   ],
   periods: [
     { id: "3", menu: "3 месяца", chip: "3 мес", label: "Сен 2026 – Ноя 2026", za: "за 3 месяца", zaShort: "за 3 мес." },

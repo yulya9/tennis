@@ -577,11 +577,13 @@
   .period {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 16px;
+    gap: 0;
+    padding: 0 12px 0 4px;
   }
   .period p {
     flex: 1;
+    min-width: 0;
+    white-space: nowrap;
     margin: 0;
     text-align: center;
     font-size: 15px;
@@ -598,6 +600,7 @@
   }
   .iconbtn img { width: 24px; height: 24px; }
   .iconbtn:active { transform: scale(0.92); }
+  .iconbtn:disabled { opacity: 0.3; pointer-events: none; }
   .chip-period {
     display: inline-flex;
     align-items: center;
@@ -912,7 +915,7 @@
     <p class="hint">Карточка открывает экран. Назад — кнопка или свайп от левого края.</p>
   </div>
 </div>
-<script src="data.js"></script>
+<script src="data.js?v=3"></script>
 <script>
 (function () {
   const D = window.MYTENNIS;
@@ -984,6 +987,20 @@
     return `<button class="back" type="button" data-pop aria-label="Назад"><span><img src="assets/chevron-left.svg" alt=""></span></button>`;
   }
 
+  const MONTH_TOTAL = D.series.ntrp.length;
+  D.offset = 0;
+  const MONTH_NAMES = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+  const monthAt = g => {
+    const k = D.start.m + g;
+    return { name: MONTH_NAMES[k % 12], y: D.start.y + Math.floor(k / 12) };
+  };
+  function periodLabel(per) {
+    const n = Number(per.id);
+    const end = MONTH_TOTAL - 1 - D.offset;
+    const a = monthAt(end - n + 1), b = monthAt(end);
+    return `${a.name} ${a.y} – ${b.name} ${b.y}`;
+  }
+
   function periodNow() {
     return D.periods.find(item => item.id === D.periodId) || D.periods[1];
   }
@@ -991,8 +1008,9 @@
   function periodRow() {
     const period = periodNow();
     return `<div class="period">
-      <button class="iconbtn" type="button" aria-label="Назад по периоду"><img src="assets/chevron-left.svg" alt=""></button>
-      <p data-period-label>${period.label}</p>
+      <button class="iconbtn" type="button" data-shift="-1" aria-label="Назад по периоду"><img src="assets/chevron-left.svg" alt=""></button>
+      <p data-period-label>${periodLabel(period)}</p>
+      <button class="iconbtn" type="button" data-shift="1" aria-label="Вперёд по периоду"><img src="assets/chevron-right.svg" alt=""></button>
       <button class="chip-period" type="button" data-period-open aria-haspopup="menu" aria-expanded="false">${period.chip}<img src="assets/chevron-updown.svg" alt=""></button>
     </div>`;
   }
@@ -1007,25 +1025,53 @@
     return c;
   };
 
+  /* показатели периода: для текущего окна из data.js, для сдвинутых считаются от него */
+  function periodStats(id, off, total, ntrp) {
+    const base = D.stats[id];
+    const delta = num(((ntrp[ntrp.length - 1] - ntrp[0]) * 10 / 10).toFixed(1));
+    if (off === 0) return Object.assign({}, base, { ntrpDelta: delta });
+    const wob = (k, m) => ((off * k) % m) - Math.floor(m / 2);
+    const t0 = Math.round(total * base.opp[0].t / base.wins.t);
+    const t1 = Math.round(total * base.opp[1].t / base.wins.t);
+    const ts = [t0, t1, Math.max(0, total - t0 - t1)];
+    const opp = ts.map((t, i) => {
+      const f = base.opp[i].w / base.opp[i].t;
+      const w = Math.min(t, Math.max(0, Math.round(t * f + wob(i + 2, 3) * 0.4)));
+      return { w, t };
+    });
+    const w = opp.reduce((a, o) => a + o.w, 0);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    return {
+      ntrpDelta: delta,
+      winsDelta: `+${[3, 5, 2, 4, 1][off % 5]} п.п.`,
+      wins: { w, t: total },
+      bars: base.bars.map((b, i) => clamp(b + wob(i + 3, 7), 25, 90)),
+      opp,
+      surface: { hard: clamp(base.surface.hard + wob(5, 9), 30, 90), clay: clamp(base.surface.clay + wob(3, 7), 30, 90) }
+    };
+  }
+
   function model(id) {
     const n = Number(id);
     const per = D.periods.find(p => p.id === id) || D.periods[1];
-    const st = D.stats[id];
-    const labels = D.months12.slice(-n);
-    const ntrp = D.series.ntrp.slice(-n);
-    const cnt = D.series.matches.slice(-n);
+    const end = MONTH_TOTAL - D.offset, start = end - n, off = D.offset;
+    const labels = [];
+    for (let g = start; g < end; g++) labels.push(monthAt(g).name);
+    const ntrp = D.series.ntrp.slice(start, end);
+    const cnt = D.series.matches.slice(start, end);
     const total = cnt.reduce((a, b) => a + b, 0);
     const peak = Math.max(...cnt);
     const peakI = cnt.indexOf(peak);
+    const st = periodStats(id, off, total, ntrp);
     const winPct = pct(st.wins.w, st.wins.t);
     const barAvg = Math.round(st.bars.reduce((a, b) => a + b, 0) / st.bars.length);
     const best = st.surface.hard >= st.surface.clay ? "hard" : "clay";
-    return { id, n, per, st, labels, ntrp, cnt, total, peak, peakI, winPct, barAvg, best, minM: 12 - n, avg: (Math.round(total / n * 10) / 10).toFixed(1) };
+    return { id, n, per, st, labels, ntrp, cnt, total, peak, peakI, winPct, barAvg, best, start, end, avg: (Math.round(total / n * 10) / 10).toFixed(1) };
   }
 
   function pickMatches(vm, filter) {
     return D.pool
-      .filter(r => r.m >= vm.minM && filter(r))
+      .filter(r => r.m >= vm.start && r.m < vm.end && filter(r))
       .sort((a, b) => b.m - a.m || b.day - a.day)
       .slice(0, 3);
   }
@@ -1034,6 +1080,7 @@
     const v = vm.ntrp;
     const gains = v.slice(1).map((x, i) => Math.round((x - v[i]) * 10));
     const up = gains.filter(g => g > 0).length;
+    if (v[v.length - 1] - v[0] <= 0) return `Уровень держался на ${num(v[v.length - 1].toFixed(1))} ${vm.per.za}`;
     const head = `Вырос на ${vm.st.ntrpDelta} ${vm.per.za}`;
     if (up === gains.length) return `${head}, рост каждый месяц`;
     if (up / gains.length >= 0.75) return `${head}, рост был почти каждый месяц`;
@@ -1189,13 +1236,13 @@
 
   /* ---------- слоты, которые пересобираются при смене периода ---------- */
   const slots = {
-    "home-delta": vm => `▲ ${vm.st.ntrpDelta} ${vm.per.zaShort}`,
+    "home-delta": vm => `${vm.st.ntrpDelta === "0,0" ? "" : "▲ "}${vm.st.ntrpDelta} ${vm.per.zaShort}`,
     "home-caption": vm => `Динамика уровня NTRP ${vm.per.za}`,
     "home-chart": vm => lineChart("home", vm.labels, vm.ntrp, {
       steps: [0.1, 0.2, 0.5],
       text: v => v.toFixed(1),
       tick: v => v.toFixed(1),
-      tip: i => (i === vm.n - 1 ? "Сегодня" : ""),
+      tip: i => (i === vm.n - 1 && D.offset === 0 ? "Сегодня" : ""),
       select: vm.n - 1
     }),
     "home-insight": vm => homeInsight(vm),
@@ -1479,6 +1526,7 @@
   }
 
   stackEl.innerHTML = home() + wins() + matches() + opponents() + surface();
+  syncShift();
   refreshChartsDefault();
 
   const periodMenu = document.createElement("div");
@@ -1498,13 +1546,35 @@
     });
   }
 
+  function syncShift() {
+    const per = periodNow();
+    const maxOff = MONTH_TOTAL - Number(per.id);
+    D.offset = Math.min(D.offset, maxOff);
+    stackEl.querySelectorAll("[data-shift]").forEach(btn => {
+      const off = D.offset - Number(btn.dataset.shift);
+      btn.disabled = off < 0 || off > maxOff;
+    });
+  }
+
+  function shiftPeriod(dir) {
+    const per = periodNow();
+    const off = D.offset - dir;
+    if (off < 0 || off > MONTH_TOTAL - Number(per.id)) return;
+    D.offset = off;
+    stackEl.querySelectorAll("[data-period-label]").forEach(node => { node.textContent = periodLabel(per); });
+    Object.keys(charts).forEach(id => { delete charts[id].cur; });
+    fillSlots(model(per.id));
+    syncShift();
+  }
+
   function applyPeriod(id) {
     const period = D.periods.find(item => item.id === id);
     if (!period) return;
     D.periodId = id;
     stackEl.querySelectorAll("[data-period-label]").forEach(node => {
-      node.textContent = period.label;
+      node.textContent = periodLabel(period);
     });
+    syncShift();
     stackEl.querySelectorAll("[data-period-open]").forEach(node => {
       node.firstChild.textContent = period.chip;
     });
@@ -1862,6 +1932,11 @@
   }
 
   stackEl.addEventListener("click", (event) => {
+    const shift = event.target.closest("[data-shift]");
+    if (shift) {
+      shiftPeriod(Number(shift.dataset.shift));
+      return;
+    }
     const choice = event.target.closest("[data-period]");
     if (choice) {
       applyPeriod(choice.dataset.period);
