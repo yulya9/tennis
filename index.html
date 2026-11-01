@@ -244,7 +244,16 @@
     line-height: 72px;
     color: #fff;
   }
+  .flap { perspective: 320px; }
+  .flap .h { position: absolute; left: 0; width: 60px; height: 42px; overflow: hidden; backface-visibility: hidden; }
+  .flap .h.t { top: 0; }
+  .flap .h.b { top: 42px; }
+  .flap .h.t span { top: 6px; }
+  .flap .h.b span { top: -36px; }
+  .flap .h.fl-t { background: var(--flap-top); z-index: 2; transform-origin: 50% 100%; box-shadow: 0 1px 0 #fff; }
+  .flap .h.fl-b { background: var(--flap-bottom); z-index: 2; transform-origin: 50% 0; }
   .flap i {
+    z-index: 3;
     position: absolute;
     top: 38px;
     width: 2px;
@@ -685,6 +694,8 @@
     height: 16px;
     background: #f0f0f0;
   }
+  .track .fill.right { transform-origin: left center; }
+  .track .fill.left { transform-origin: right center; }
   .track .fill {
     position: absolute;
     top: 4px;
@@ -1357,12 +1368,160 @@
   }
 
   function fillSlots(vm, only) {
+    const before = only ? null : numberEls().map(el => el.textContent);
+    const oldPts = {};
+    Object.keys(charts).forEach(id => { oldPts[id] = charts[id].pts; });
     stackEl.querySelectorAll("[data-slot]").forEach(node => {
       if (only && node.dataset.slot !== only) return;
       const fn = slots[node.dataset.slot];
       if (fn) node.innerHTML = fn(vm);
     });
     refreshChartsDefault();
+    if (before) animateUpdate(before, oldPts);
+  }
+
+  /* ---------- анимации ---------- */
+  const EASE = "cubic-bezier(.22,.61,.36,1)";
+  const shown = el => !!(el && el.getClientRects().length);
+  const NUM_SEL = '[data-slot$="-value"], [data-slot$="-delta"], .tile strong, .metric .lab b, .g-count, .g-pct, .arcs .val';
+  const numberEls = () => Array.from(stackEl.querySelectorAll(NUM_SEL));
+  const morphRaf = {};
+
+  function flapHtml(d) {
+    return `<div class="flap" data-v="${d}"><div class="h t"><span>${d}</span></div><div class="h b"><span>${d}</span></div><i class="l"></i><i class="r"></i></div>`;
+  }
+
+  async function flipFlap(flap, seq) {
+    const top = flap.querySelector(".h.t span"), bot = flap.querySelector(".h.b span");
+    top.textContent = bot.textContent = seq[0];
+    const mk = (cls, d) => {
+      const e = document.createElement("div");
+      e.className = "h " + cls;
+      e.innerHTML = `<span>${d}</span>`;
+      flap.appendChild(e);
+      return e;
+    };
+    for (let i = 1; i < seq.length; i++) {
+      top.textContent = seq[i];
+      bot.textContent = seq[i - 1];
+      const a = mk("t fl-t", seq[i - 1]);
+      await a.animate([{ transform: "rotateX(0deg)" }, { transform: "rotateX(-90deg)" }], { duration: 90, easing: "ease-in" }).finished;
+      a.remove();
+      const b = mk("b fl-b", seq[i]);
+      bot.textContent = seq[i];
+      await b.animate([{ transform: "rotateX(90deg)" }, { transform: "rotateX(0deg)" }], { duration: 120, easing: "cubic-bezier(.3,1.4,.5,1)" }).finished;
+      b.remove();
+    }
+  }
+
+  function flipIn(root, delay) {
+    root.querySelectorAll(".flap").forEach((flap, i) => {
+      const t = Number(flap.dataset.v);
+      const seq = [3, 2, 1, 0].map(k => (t - k + 10) % 10);
+      flap.querySelectorAll(".h span").forEach(sp => { sp.textContent = seq[0]; });
+      setTimeout(() => flipFlap(flap, seq), delay + i * 160);
+    });
+  }
+
+  function drawChart(chart, delay) {
+    const ln = chart.querySelector(".ln");
+    const ar = chart.querySelector('path[fill^="url(#ar-"]');
+    ln.setAttribute("pathLength", "1");
+    ln.animate([{ strokeDasharray: "1 2", strokeDashoffset: 1 }, { strokeDasharray: "1 2", strokeDashoffset: 0 }], { duration: 900, delay, easing: EASE, fill: "backwards" });
+    ar.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, delay: delay + 400, easing: "ease-out", fill: "backwards" });
+    const n = chart.querySelectorAll(".mdot").length;
+    chart.querySelectorAll(".mdot:not(.is-off)").forEach(d => {
+      const i = Number(d.dataset.dot);
+      d.animate([{ opacity: 0, transform: "scale(0.2)" }, { opacity: 1, transform: "scale(1)" }], { duration: 260, delay: delay + 120 + i / Math.max(1, n - 1) * 700, easing: "cubic-bezier(.3,1.5,.5,1)", fill: "backwards" });
+    });
+    chart.querySelectorAll(".halo, .pdot, .scrub, .tooltip").forEach(e => {
+      e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, delay: delay + 800, fill: "backwards" });
+    });
+  }
+
+  function morphChart(id, from) {
+    const chart = document.querySelector(`[data-chart="${id}"]`);
+    const c = charts[id];
+    const to = c.pts;
+    const ln = chart.querySelector(".ln");
+    const ar = chart.querySelector('path[fill^="url(#ar-"]');
+    const dots = chart.querySelectorAll(".mdot");
+    const hits = chart.querySelectorAll(".hit");
+    chart.querySelectorAll(".ylab").forEach(e => e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: "ease-out" }));
+    cancelAnimationFrame(morphRaf[id]);
+    const t0 = performance.now(), DUR = 550;
+    const frame = now => {
+      const p = Math.min(1, (now - t0) / DUR);
+      const e = 1 - Math.pow(1 - p, 3);
+      const cur = to.map((pt, i) => Object.assign({}, pt, { y: from[i].y + (pt.y - from[i].y) * e }));
+      const d = smooth(cur);
+      ln.setAttribute("d", d);
+      ar.setAttribute("d", `${d} L ${cur[cur.length - 1].x.toFixed(1)} 260 L ${cur[0].x.toFixed(1)} 260 Z`);
+      cur.forEach((pt, i) => {
+        dots[i].style.top = (pt.y - 4).toFixed(1) + "px";
+        hits[i].style.top = pt.y.toFixed(1) + "px";
+      });
+      c.pts = cur;
+      selectPoint(id, c.cur != null ? c.cur : c.sel);
+      if (p < 1) morphRaf[id] = requestAnimationFrame(frame);
+      else { c.pts = to; selectPoint(id, c.cur != null ? c.cur : c.sel); }
+    };
+    morphRaf[id] = requestAnimationFrame(frame);
+  }
+
+  function countUp(el, oldT) {
+    const newT = el.textContent;
+    if (oldT === newT) return;
+    const re = /\d+(?:,\d+)?/;
+    const a = oldT.match(re), b = newT.match(re);
+    if (!a || !b) return;
+    const num = x => parseFloat(x.replace(",", "."));
+    const from = num(a[0]), to = num(b[0]);
+    if (from === to) return;
+    const dec = (b[0].split(",")[1] || "").length;
+    const token = el._ct = (el._ct || 0) + 1;
+    const t0 = performance.now(), DUR = 650;
+    const step = now => {
+      if (el._ct !== token) return;
+      const p = Math.min(1, (now - t0) / DUR);
+      const v = from + (to - from) * (1 - Math.pow(1 - p, 3));
+      el.textContent = p < 1 ? newT.replace(re, v.toFixed(dec).replace(".", ",")) : newT;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  function growMetrics(root, delay) {
+    root.querySelectorAll('.arcs-svg path[stroke^="url("]').forEach((p, i) => {
+      if (!shown(p)) return;
+      p.setAttribute("pathLength", "1");
+      p.animate([{ strokeDasharray: "1 2", strokeDashoffset: 1 }, { strokeDasharray: "1 2", strokeDashoffset: 0 }], { duration: 900, delay: delay + i * 140, easing: EASE, fill: "backwards" });
+    });
+    root.querySelectorAll(".track .fill").forEach((f, i) => {
+      if (!shown(f)) return;
+      f.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 650, delay: delay + i * 70, easing: EASE, fill: "backwards" });
+    });
+  }
+
+  function playIn(root, delay) {
+    if (reduce || !root) return;
+    root.querySelectorAll(".chart").forEach(chart => { if (shown(chart)) drawChart(chart, delay); });
+    growMetrics(root, delay);
+    flipIn(root, delay);
+  }
+
+  function animateUpdate(before, oldPts) {
+    if (reduce) return;
+    const els = numberEls();
+    if (els.length === before.length) els.forEach((el, i) => { if (shown(el)) countUp(el, before[i]); });
+    Object.keys(charts).forEach(id => {
+      const chart = document.querySelector(`[data-chart="${id}"]`);
+      if (!shown(chart) || !charts[id]) return;
+      const old = oldPts[id], cur = charts[id].pts;
+      if (old && old.length === cur.length) morphChart(id, old);
+      else drawChart(chart, 0);
+    });
+    growMetrics(stackEl, 0);
   }
 
   function refreshChartsDefault() {
@@ -1408,9 +1567,9 @@
         </div>
         <div class="px hero-level">
           <div class="digits">
-            <div class="flap"><span>${h.digits[0]}</span><i class="l"></i><i class="r"></i></div>
+            ${flapHtml(h.digits[0])}
             <img class="decimal" src="assets/decimal.svg?v=3" alt="">
-            <div class="flap"><span>${h.digits[1]}</span><i class="l"></i><i class="r"></i></div>
+            ${flapHtml(h.digits[1])}
           </div>
           <div class="level-info">
             <p>${h.levelCaption}</p>
@@ -1528,6 +1687,7 @@
   stackEl.innerHTML = home() + wins() + matches() + opponents() + surface();
   syncShift();
   refreshChartsDefault();
+  playIn(stackEl.querySelector(".screen:not([hidden])"), 150);
 
   const periodMenu = document.createElement("div");
   periodMenu.className = "period-menu";
@@ -1836,6 +1996,7 @@
     const to = screen(id);
     to.hidden = false;
     refreshCharts();
+    playIn(to, 220);
     to.style.zIndex = "2";
     from.style.zIndex = "1";
     if (sourceEl) zoomFrom[id] = sourceEl;
