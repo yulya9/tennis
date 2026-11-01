@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MYTENNIS — аналитика</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geologica:wght@400;500&family=Inter:wght@600&family=Onest:wght@400;500&family=Outfit:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ececec;
+    --ink: #0d0d0d;
+    --secondary: rgba(13, 13, 13, 0.66);
+    --tertiary: rgba(13, 13, 13, 0.6);
+    --card: rgba(255, 255, 255, 0.92);
+    --panel: #fff;
+    --cobalt: #2e3dff;
+    --cobalt-line: #2f3dff;
+    --flap-top: #1348ff;
+    --flap-bottom: #0836d7;
+    --lime: #eaff00;
+    --success: #00754e;
+    --success-surface: #c7f0e2;
+    --danger: #b8231a;
+    --clay: #d92d20;
+    --loss-surface: #f6d5d2;
+    --nav: #0d0d0d;
+    --nav-idle: rgba(255, 255, 255, 0.72);
+    --radius-s: 12px;
+    --radius-l: 28px;
+    --push: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #d5d5d5;
+    color: var(--ink);
+    font-family: Onest, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .stage {
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    padding: 28px 16px 40px;
+  }
+  .device {
+    width: 414px;
+    height: 868px;
+    padding: 12px;
+    border-radius: 54px;
+    background: #0a0a0a;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  }
+  .screen-clip {
+    position: relative;
+    width: 390px;
+    height: 844px;
+    overflow: hidden;
+    border-radius: 42px;
+    background: var(--bg);
+  }
+  .stack { position: absolute; inset: 0; }
+  .screen {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+    box-shadow: -16px 0 32px rgba(0, 0, 0, 0.12);
+  }
+  .screen.is-home { box-shadow: none; }
+  .scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: none;
+    cursor: grab;
+  }
+  .scroll.is-dragging { cursor: grabbing; }
+  .scroll img {
+    -webkit-user-drag: none;
+    user-select: none;
+    pointer-events: none;
+  }
+  .scroll::-webkit-scrollbar { display: none; }
+  .scroll-inner { min-height: 100%; }
+  .screen > .status,
+  .screen > .topbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    pointer-events: none;
+  }
+  .topbar.is-scrolled { background: #ececec; }
+  .topbar .nav-slot {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ececec;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .topbar .inline-title {
+    margin: 0;
+    font-family: Geologica, sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    line-height: 22px;
+  }
+  .dhero-stick {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    background: var(--cobalt);
+    color: #fff;
+  }
+  .dhero-rest {
+    position: relative;
+        z-index: 0;
+        background: var(--cobalt);
+    color: #fff;
+    border-radius: 0 0 28px 28px;
+    padding-bottom: 24px;
+  }
+  .ios-bar {
+    position: absolute;
+    top: 70px;
+    right: 3px;
+    width: 3px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 0 0 0.5px rgba(13, 13, 13, 0.28);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 6;
+    transition: opacity 480ms linear;
+  }
+  .ios-bar.on { opacity: 1; transition: none; }
+  .home-pad { padding-bottom: 134px; display: flex; flex-direction: column; gap: 20px; }
+  .detail-pad { padding-bottom: 48px; display: flex; flex-direction: column; gap: 20px; }
+
+  .is-home .scroll-inner { padding-top: 62px; }
+  .status-space { height: 62px; flex: none; }
+  .status {
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px 0;
+  }
+  .status time {
+    font-family: Inter, sans-serif;
+    font-weight: 600;
+    font-size: 17px;
+    line-height: 22px;
+  }
+  .status-icons { display: flex; align-items: center; gap: 6px; }
+  .status-icons img { display: block; }
+  .status.on-cobalt, .status.on-cobalt time { color: #fff; }
+
+  .large-title {
+    margin: 0;
+    padding: 0 16px;
+    font-family: Geologica, sans-serif;
+    font-weight: 500;
+    font-size: 34px;
+    line-height: 41px;
+  }
+  .px { padding-left: 16px; padding-right: 16px; }
+
+  .player {
+    width: 100%;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px 12px 12px;
+    background: var(--card);
+    border-radius: var(--radius-l);
+    text-align: left;
+  }
+  .player img.avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+  .player .who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .player .name { font-weight: 500; font-size: 17px; line-height: 22px; }
+  .player .city { font-size: 15px; line-height: 20px; color: var(--secondary); }
+  .player:active { transform: scale(0.97); }
+
+  .hero-level {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 84px;
+  }
+  .digits { display: flex; align-items: center; gap: 8px; }
+  .flap {
+    position: relative;
+    width: 60px;
+    height: 84px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(var(--flap-top) 0 42px, #fff 41px 43px, var(--flap-bottom) 42px 84px);
+  }
+  .flap span {
+    position: absolute;
+    left: 12px;
+    top: 6px;
+    font-family: Geologica, sans-serif;
+    font-weight: 400;
+    font-size: 60px;
+    line-height: 72px;
+    color: #fff;
+  }
+  .flap i {
+    position: absolute;
+    top: 38px;
+    width: 2px;
+    height: 8px;
+    background: #fff;
+    border-radius: 1px;
+  }
+  .flap i.l { left: 0; }
+  .flap i.r { right: 0; }
+  .decimal { width: 12px; height: 84px; display: block; }
+  .level-info { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .level-info p { margin: 0; font-size: 15px; line-height: 20px; color: var(--secondary); }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 100px;
+    background: var(--success-surface);
+    color: var(--success);
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 20px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border-radius: var(--radius-l);
+    padding: 20px 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .chart-caption {
+    margin: 0;
+    padding: 0 16px;
+    font-size: 15px;
+    line-height: 20px;
+    color: var(--secondary);
+  }
+  .chart {
+    position: relative;
+    height: 260px;
+    overflow: hidden;
+  }
+  .chart .area { position: absolute; left: 25px; top: 84px; width: 308px; height: 218px; }
+  .chart .grid { position: absolute; left: 0; top: -30px; width: 358px; height: 344px; }
+  .chart .line { position: absolute; left: 25px; top: 84px; width: 308px; height: 105px; }
+  .chart .hit {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+    border-radius: 50%;
+    z-index: 3;
+  }
+  .chart .halo,
+  .chart .pdot,
+  .chart .scrub,
+  .chart .tooltip {
+    transition: left 180ms cubic-bezier(0.32, 0.72, 0, 1), top 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .chart .mdot.is-off { visibility: hidden; }
+  .chart .scrub {
+    position: absolute;
+    left: 332px;
+    top: 58px;
+    width: 1px;
+    height: 198px;
+    background: rgba(13, 13, 13, 0.28);
+  }
+  .chart .halo { position: absolute; left: 323px; top: 74px; width: 20px; height: 20px; }
+  .chart .pdot { position: absolute; left: 327px; top: 78px; width: 12px; height: 12px; }
+  .chart .ylab {
+    position: absolute;
+    left: 16px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--tertiary);
+  }
+  .tooltip {
+    position: absolute;
+    left: 217px;
+    top: 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 100px;
+    background: var(--lime);
+    font-size: 15px;
+    line-height: 20px;
+    white-space: nowrap;
+  }
+  .tooltip b { font-weight: 500; }
+  .months {
+    position: relative;
+    height: 44px;
+    margin: 0 16px;
+  }
+  .months span,
+  .months button {
+    position: absolute;
+    top: 0;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--secondary);
+  }
+  .months span.on,
+  .months button.on { color: var(--cobalt); }
+
+  .panel > .insight { margin: 0 16px; }
+  .sheet .insight { margin: 0 16px; }
+  .px > .insight { margin: 0; }
+  .insight {
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--radius-s);
+    background: var(--lime);
+  }
+  .insight .mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #fff;
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+  .insight .mark img { width: 24px; height: 24px; }
+  .insight p { margin: 0; font-size: 15px; line-height: 20px; }
+
+  .tile-row { display: flex; gap: 4px; }
+  .tile {
+    flex: 1;
+    min-width: 0;
+    min-height: 134px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 16px;
+    border-radius: var(--radius-l);
+    background: var(--card);
+    text-align: left;
+  }
+  .tile-head { display: flex; align-items: center; gap: 8px; width: 100%; }
+  .tile-head .bubble {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--cobalt);
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+  .tile-head img { width: 24px; height: 24px; }
+  .tile-head span { font-weight: 500; font-size: 15px; line-height: 20px; }
+  .tile strong {
+    display: block;
+    font-family: Geologica, sans-serif;
+    font-weight: 500;
+    font-size: 22px;
+    line-height: 28px;
+  }
+  .tile em {
+    display: block;
+    font-style: normal;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--secondary);
+  }
+  .tile em.success { color: var(--success); }
+  button.tile,
+  .player,
+  .tab,
+  .back,
+  .iconbtn,
+  .primary,
+  .seg button,
+  .chip-period,
+  .chip-on {
+    transition: transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  }
+  button.tile:active { transform: scale(0.96); }
+  .overview { display: flex; flex-direction: column; gap: 4px; }
+
+  .tabbar {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 42px;
+    height: 72px;
+    display: flex;
+    padding: 8px;
+    border-radius: 36px;
+    background: var(--nav);
+    z-index: 3;
+  }
+  .tab {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--nav-idle);
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .tab img { width: 24px; height: 24px; }
+  .tab.on { color: var(--lime); font-weight: 500; }
+  .tab .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--lime); }
+  .tab:active { transform: scale(0.96); }
+  .home-indicator {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 8px;
+    height: 5px;
+    display: flex;
+    justify-content: center;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .home-indicator i {
+    width: 144px;
+    height: 5px;
+    border-radius: 100px;
+    background: rgba(13, 13, 13, 0.9);
+  }
+  .screen.detail .home-indicator i { background: rgba(13, 13, 13, 0.9); }
+
+  .dnav {
+    position: relative;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    padding: 4px 16px;
+  }
+  .dnav h1 {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 19.5px;
+    margin: 0;
+    text-align: center;
+    font-family: Geologica, sans-serif;
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 25px;
+    pointer-events: none;
+  }
+  .back {
+    position: relative;
+    z-index: 1;
+    width: 44px;
+    height: 44px;
+    margin-left: -2px;
+    display: grid;
+    place-items: center;
+  }
+  .back span {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92);
+    display: grid;
+    place-items: center;
+  }
+  .back img { width: 24px; height: 24px; display: block; }
+  .back:active { transform: scale(0.92); }
+  .dvalue {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 72px;
+    padding: 0 16px;
+    overflow: hidden;
+  }
+  .dvalue .display {
+    margin: 0;
+    font-family: Outfit, sans-serif;
+    font-weight: 600;
+    font-size: 60px;
+    line-height: 60px;
+  }
+  .dvalue .lead { display: flex; align-items: center; gap: 12px; }
+  .dcaption {
+    margin: 0;
+    padding: 8px 16px 0;
+    font-size: 15px;
+    line-height: 20px;
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .chip-on {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 12px 12px 16px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 20px;
+  }
+  .chip-on img { width: 24px; height: 24px; }
+
+  .detail-pad { padding-bottom: 54px; display: flex; flex-direction: column; gap: 20px; }
+  .sheet {
+    background: #fff;
+    border-radius: 28px;
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet.wins { padding: 16px 0 20px; gap: 8px; }
+  .sheet.matches, .sheet.surface { padding: 20px 0; gap: 8px; }
+  .sheet.opponents { padding: 0 0 20px; gap: 8px; border-radius: 28px; overflow: hidden; }
+  .period {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+  }
+  .period p {
+    flex: 1;
+    margin: 0;
+    text-align: center;
+    font-size: 15px;
+    line-height: 20px;
+  }
+  .iconbtn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92);
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+  .iconbtn img { width: 24px; height: 24px; }
+  .iconbtn:active { transform: scale(0.92); }
+  .chip-period {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 12px 12px 16px;
+    border-radius: 100px;
+    background: rgba(13, 13, 13, 0.06);
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 20px;
+    flex: none;
+  }
+  .chip-period img { width: 24px; height: 24px; }
+  .period-menu {
+    position: absolute;
+    z-index: 40;
+    width: 196px;
+    padding: 4px;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 12px 40px rgba(13, 13, 13, 0.18);
+    transform-origin: top right;
+    animation: menu-in 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .period-menu button {
+    width: 100%;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    font-size: 17px;
+    line-height: 22px;
+    text-align: left;
+  }
+  .period-menu button.on { font-weight: 500; }
+  .period-menu button.on::after {
+    content: "";
+    width: 7px;
+    height: 12px;
+    margin-top: -2px;
+    border-right: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+    transform: rotate(45deg);
+  }
+  @keyframes menu-in {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .scale {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px 12px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--secondary);
+  }
+  .metric { display: flex; flex-direction: column; gap: 4px; padding: 0 16px 16px; }
+  .metric .lab {
+    display: flex;
+    justify-content: space-between;
+    font-size: 15px;
+    line-height: 20px;
+  }
+  .metric .lab b { font-weight: 500; }
+  .track { position: relative; height: 16px; }
+  .track .base {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 7px;
+    height: 2px;
+    background: rgba(13, 13, 13, 0.06);
+  }
+  .track .tick {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 1px;
+    height: 16px;
+    background: #f0f0f0;
+  }
+  .track .fill {
+    position: absolute;
+    top: 4px;
+    height: 12px;
+    border-radius: 24px;
+  }
+  .track .fill.right { background: linear-gradient(90deg, rgba(47, 61, 255, 0), #2f3dff); }
+  .track .fill.left { background: linear-gradient(90deg, #ff5900, rgba(255, 89, 0, 0.1)); }
+
+  .block-title {
+    margin: 0;
+    font-family: Geologica, sans-serif;
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 25px;
+  }
+  .block-title.plain {
+    font-family: Onest, sans-serif;
+    font-size: 17px;
+    line-height: 22px;
+  }
+  .match-list { display: flex; flex-direction: column; gap: 4px; }
+  .match {
+    height: 80px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 24px;
+    background: var(--card);
+  }
+  .result {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+  .result img { width: 24px; height: 24px; }
+  .result.win { background: #c7f0e2; }
+  .result.loss { background: #f9d4d0; }
+  .match .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .match .name { font-weight: 500; font-size: 17px; line-height: 22px; }
+  .match .meta, .match .date { font-size: 13px; line-height: 18px; color: var(--secondary); }
+  .match .when { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .match .score { font-weight: 500; font-size: 15px; line-height: 20px; }
+
+  .primary {
+    height: 64px;
+    width: 100%;
+    border-radius: 100px;
+    background: var(--ink);
+    color: #fff;
+    font-weight: 500;
+    font-size: 17px;
+    line-height: 22px;
+  }
+  .primary:active { transform: scale(0.97); }
+
+  .groups { background: var(--card); border-radius: 12px; overflow: hidden; }
+  .ghead, .grow {
+    display: flex;
+    align-items: center;
+    padding: 8px 20px;
+  }
+  .ghead { background: rgba(13, 13, 13, 0.12); padding-top: 16px; padding-bottom: 16px; }
+  .grow { border-bottom: 1px solid rgba(13, 13, 13, 0.08); }
+  .grow.total { border-bottom: 0; }
+  .g-name { width: 186px; flex: none; }
+  .g-name b { display: block; font-weight: 400; font-size: 15px; line-height: 20px; }
+  .g-name span { display: block; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--tertiary); }
+  .g-count { width: 70px; flex: none; text-align: right; font-size: 15px; line-height: 20px; color: rgba(13, 13, 13, 0.8); }
+  .g-pct { width: 62px; flex: none; text-align: right; font-weight: 500; font-size: 15px; line-height: 20px; }
+  .g-pct.success { color: var(--success); }
+  .g-pct.brand { color: #2f3dff; }
+  .g-pct.danger { color: #b8231a; }
+  .g-pct.ink { color: var(--ink); font-weight: 400; }
+  .ghead span { font-size: 15px; line-height: 20px; color: var(--secondary); }
+  .ghead .g-count, .ghead .g-pct { color: var(--secondary); font-weight: 400; }
+  .grow.total .g-count { color: var(--ink); }
+
+  .arcs { position: relative; height: 238px; }
+  .arcs img { position: absolute; display: block; }
+  .arcs .val {
+    position: absolute;
+    left: 143px;
+    top: 60px;
+    margin: 0;
+    font-family: Geologica, sans-serif;
+    font-weight: 500;
+    font-size: 28px;
+    line-height: 34px;
+  }
+  .arcs .note {
+    position: absolute;
+    left: 166px;
+    top: 104px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: rgba(13, 13, 13, 0.8);
+  }
+  .legend {
+    position: absolute;
+    left: 49px;
+    top: 188px;
+    display: flex;
+    gap: 8px;
+  }
+  .legend i {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px 8px 12px;
+    border-radius: 24px;
+    background: var(--card);
+    font-style: normal;
+    font-size: 15px;
+    line-height: 20px;
+    color: rgba(13, 13, 13, 0.8);
+  }
+  .legend img { width: 10px; height: 10px; }
+  .legend b { font-weight: 500; }
+  .legend b.brand { color: #2f3dff; }
+  .legend b.clay { color: #d92d20; }
+
+  .seg {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 24px;
+    background: var(--card);
+  }
+  .seg button {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 100px;
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 20px;
+    color: var(--secondary);
+  }
+  .seg button.on { background: var(--ink); color: #fff; }
+  .seg button:active,
+  .chip-period:active,
+  .chip-on:active { transform: scale(0.96); }
+
+  .mchart { position: relative; height: 222px; overflow: hidden; }
+  .mchart img { position: absolute; display: block; }
+  .mchart .ylab {
+    position: absolute;
+    left: 31px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--tertiary);
+  }
+  .mchart .scrub {
+    position: absolute;
+    left: 86px;
+    top: 72px;
+    width: 1px;
+    height: 149px;
+    background: rgba(13, 13, 13, 0.28);
+  }
+  .mchart .tooltip { left: 57px; top: 0; }
+
+  .hint {
+    margin: 14px 0 0;
+    text-align: center;
+    font-size: 13px;
+    line-height: 18px;
+    color: rgba(13, 13, 13, 0.66);
+  }
+  @media (max-height: 940px) {
+    .stage { padding-top: 12px; padding-bottom: 16px; }
+    .device { transform: scale(calc((100vh - 72px) / 868)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .screen, .period-menu,
+    button.tile, .player, .tab, .back, .iconbtn, .primary, .seg button, .chip-period, .chip-on,
+    .chart .halo, .chart .pdot, .chart .scrub, .chart .tooltip {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div>
+    <div class="device">
+      <div class="screen-clip">
+        <div class="stack" id="stack"></div>
+      </div>
+    </div>
+    <p class="hint">Карточка открывает экран. Назад — кнопка или свайп от левого края.</p>
+  </div>
+</div>
+<script src="data.js"></script>
+<script>
+(function () {
+  const D = window.MYTENNIS;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const PUSH = "transform 350ms cubic-bezier(0.32, 0.72, 0, 1)";
+  const ZOOM = "clip-path 460ms cubic-bezier(0.32, 0.72, 0, 1)";
+  const ZOOM_BACK = "transform 460ms cubic-bezier(0.32, 0.72, 0, 1)";
+  const zoomFrom = {};
+  const stackEl = document.getElementById("stack");
+  const history = ["home"];
+  let dragging = false;
+  let lock = false;
+
+  function status(tone) {
+    const light = tone === "light";
+    const cell = light ? "cellular-light" : "cellular";
+    const wifi = light ? "wifi-light" : "wifi";
+    const battery = light ? "battery-light" : "battery";
+    return `<div class="status${light ? " on-cobalt" : ""}">
+      <time>9:41</time>
+      <div class="status-icons">
+        <img src="assets/${cell}.svg" width="19" height="12" alt="">
+        <img src="assets/${wifi}.svg" width="17" height="12" alt="">
+        <img src="assets/${battery}.svg" width="27" height="13" alt="">
+      </div>
+    </div>`;
+  }
+
+  function indicator() {
+    return `<div class="home-indicator"><i></i></div>`;
+  }
+
+  function insight(text, copy) {
+    return `<div class="insight"><div class="mark"><img src="assets/insight.svg" alt=""></div><p${copy ? ` data-period-copy="${copy}"` : ""}>${text}</p></div>`;
+  }
+
+  function tiles(items, linked) {
+    const rows = [items.slice(0, 2), items.slice(2)];
+    return `<div class="overview">${rows.filter(r => r.length).map(row => `
+      <div class="tile-row">${row.map(t => `
+        <${linked ? "button" : "div"} class="tile"${linked ? ` data-push="${t.id}" type="button"` : ""}>
+          <div class="tile-head">
+            ${t.icon ? `<div class="bubble"><img src="${t.icon}" alt=""></div>` : ""}
+            <span>${t.title}</span>
+          </div>
+          <div>
+            <strong>${t.value}</strong>
+            <em class="${t.noteTone || ""}"${t.noteCopy ? ` data-period-copy="${t.noteCopy}"` : ""}>${t.note}</em>
+          </div>
+        </${linked ? "button" : "div"}>`).join("")}</div>`).join("")}</div>`;
+  }
+
+  function matchRows(rows) {
+    return `<div class="match-list">${rows.map(r => `
+      <div class="match">
+        <div class="result ${r.result}" aria-hidden="true"><img src="assets/${r.result === "win" ? "thumb-up" : "thumb-down"}.svg" alt=""></div>
+        <div class="info">
+          <div class="name">${r.name}</div>
+          <div class="meta">${r.meta}</div>
+        </div>
+        <div class="when">
+          <div class="score">${r.score}</div>
+          <div class="date">${r.date}</div>
+        </div>
+      </div>`).join("")}</div>`;
+  }
+
+  function backBtn() {
+    return `<button class="back" type="button" data-pop aria-label="Назад"><span><img src="assets/chevron-left.svg" alt=""></span></button>`;
+  }
+
+  function periodNow() {
+    return D.periods.find(item => item.id === D.periodId) || D.periods[1];
+  }
+
+  function periodRow() {
+    const period = periodNow();
+    return `<div class="period">
+      <button class="iconbtn" type="button" aria-label="Назад по периоду"><img src="assets/chevron-left.svg" alt=""></button>
+      <p data-period-label>${period.label}</p>
+      <button class="chip-period" type="button" data-period-open aria-haspopup="menu" aria-expanded="false">${period.chip}<img src="assets/chevron-updown.svg" alt=""></button>
+    </div>`;
+  }
+
+  function hero(block) {
+    const chip = block.chip
+      ? `<button class="chip-on" type="button" data-period-open aria-haspopup="menu" aria-expanded="false">${block.chip}<img src="assets/chevron-updown-light.svg" alt=""></button>`
+      : "";
+    return `<div class="dhero-stick">
+      <div class="status-space"></div>
+      <div class="dnav">${backBtn()}<h1>${block.title}</h1></div>
+    </div>
+    <div class="dhero-rest">
+      <div class="dvalue">
+        <div class="lead">
+          <p class="display">${block.value}</p>
+          ${block.delta ? `<span class="pill">${block.delta}</span>` : ""}
+        </div>
+        ${chip}
+      </div>
+      <p class="dcaption"${block.captionCopy ? ` data-period-copy="${block.captionCopy}"` : ""}>${block.caption}</p>
+    </div>`;
+  }
+
+  function home() {
+    const h = D.home;
+    const monthLeft = [-8, 49, 113, 173, 236, 293];
+    return `<section class="screen is-home" data-screen="home">
+      <div class="topbar">
+        ${status("dark")}
+        <div class="nav-slot"><p class="inline-title">${h.title}</p></div>
+      </div>
+      <div class="scroll"><div class="scroll-inner">
+        <div class="home-pad">
+        <h1 class="large-title">${h.title}</h1>
+        <div class="px">
+          <button class="player" type="button">
+            <img class="avatar" src="${D.player.avatar}" alt="">
+            <span class="who"><span class="name">${D.player.name}</span><span class="city">${D.player.city}</span></span>
+            <img src="assets/chevron.svg" width="24" height="24" alt="">
+          </button>
+        </div>
+        <div class="px hero-level">
+          <div class="digits">
+            <div class="flap"><span>${h.digits[0]}</span><i class="l"></i><i class="r"></i></div>
+            <img class="decimal" src="assets/decimal.svg" alt="">
+            <div class="flap"><span>${h.digits[1]}</span><i class="l"></i><i class="r"></i></div>
+          </div>
+          <div class="level-info">
+            <p>${h.levelCaption}</p>
+            <span class="pill" data-period-copy="${h.deltaCopy}">${h.delta}</span>
+          </div>
+        </div>
+        <div class="px">
+          <div class="panel">
+            <p class="chart-caption" data-period-copy="${h.chartCopy}">${h.chartTitle}</p>
+            <div class="chart">
+              <img class="area" src="assets/area.svg" alt="">
+              <img class="grid" src="assets/grid.svg" alt="">
+              <img class="line" src="assets/line.svg" alt="">
+              ${h.months.map((m, i) => `<img class="mdot${m.selected ? " is-off" : ""}" data-dot="${i}" style="left:${m.x - 4}px;top:${m.y - 4}px" src="assets/month-dot.svg" alt="">`).join("")}
+              <i class="scrub"></i>
+              <img class="halo" src="assets/peak-halo.svg" alt="">
+              <img class="pdot" src="assets/peak-dot.svg" alt="">
+              ${h.yLabels.map((y, i) => `<p class="ylab" style="top:${34.5 + i * 52.3}px">${y}</p>`).join("")}
+              <div class="tooltip"><span>${h.tooltip.month}</span><b>${h.tooltip.value}</b></div>
+              ${h.months.map((m, i) => `<button class="hit" type="button" data-point="${i}" style="left:${m.x}px;top:${m.y}px" aria-label="${m.tip || m.label} ${m.value}"></button>`).join("")}
+            </div>
+            <div class="months">
+              ${h.months.map((m, i) => `<button class="${m.selected ? "on" : ""}" type="button" data-point="${i}" style="left:${monthLeft[i]}px">${m.label}</button>`).join("")}
+            </div>
+            ${insight(h.insight, h.insightCopy)}
+          </div>
+        </div>
+        <div class="px">${tiles(h.tiles, true)}</div>
+      </div></div></div>
+      <nav class="tabbar">${D.tabs.map(t => `
+        <button class="tab${t.active ? " on" : ""}" type="button">
+          <img src="${t.icon}" alt="">
+          ${t.label}
+          ${t.active ? `<i class="dot"></i>` : ""}
+        </button>`).join("")}</nav>
+      ${indicator()}
+    </section>`;
+  }
+
+  function wins() {
+    const w = D.wins;
+    return `<section class="screen detail" data-screen="wins" hidden>
+      ${status("light")}
+      <div class="scroll"><div class="scroll-inner">
+        ${hero(w)}
+        <div class="detail-pad">
+          <div class="px"><div class="sheet wins">
+            ${periodRow()}
+            <div class="scale"><span>${w.scale.weak}</span><span>${w.scale.mid}</span><span>${w.scale.strong}</span></div>
+            ${w.bars.map(b => `
+              <div class="metric">
+                <div class="lab"><span>${b.label}</span><b>${b.value}</b></div>
+                <div class="track">
+                  <i class="base"></i>
+                  <i class="fill ${b.side}" style="left:${(b.left / 358) * 100}%;width:${(b.width / 358) * 100}%"></i>
+                  <i class="tick"></i>
+                </div>
+              </div>`).join("")}
+            ${insight(w.insight)}
+          </div></div>
+          <div class="px">${tiles(w.tiles, false)}</div>
+        </div>
+      </div></div>
+      ${indicator()}
+    </section>`;
+  }
+
+  function matches() {
+    const m = D.matches;
+    const monthLeft = [-8, 49, 113, 173, 236, 293];
+    const yTop = [14.5, 66.8, 119.1, 171.4];
+    const dots = [
+      [21.11, 164.4],
+      [144.22, 112.1],
+      [205.78, 190.55],
+      [267.34, 164.4],
+      [328.89, 216.7]
+    ];
+    return `<section class="screen detail" data-screen="matches" hidden>
+      ${status("light")}
+      <div class="scroll"><div class="scroll-inner">
+        ${hero(m)}
+        <div class="detail-pad">
+          <div class="px"><div class="sheet matches">
+            ${periodRow()}
+            <div class="mchart">
+              <img src="assets/matches-area.svg" alt="" style="left:25.11px;top:63.8px">
+              <img src="assets/matches-grid.svg" alt="" style="left:0;top:-69px">
+              <img src="assets/matches-line.svg" alt="" style="left:24.3px;top:62.9px">
+              <i class="scrub"></i>
+              ${dots.map(([x, y]) => `<img src="assets/m-dot.svg" alt="" style="left:${x}px;top:${y}px">`).join("")}
+              <img src="assets/sel-halo.svg" alt="" style="left:72.66px;top:49.8px">
+              <img src="assets/sel-dot.svg" alt="" style="left:80.66px;top:57.8px">
+              ${m.yLabels.map((y, i) => `<p class="ylab" style="top:${yTop[i]}px">${y}</p>`).join("")}
+              <div class="tooltip"><span>${m.tooltip.month}</span><b>${m.tooltip.value}</b></div>
+            </div>
+            <div class="months">
+              ${m.months.map((month, i) => `<span class="${month.selected ? "on" : ""}" style="left:${monthLeft[i]}px">${month.label}</span>`).join("")}
+            </div>
+            ${insight(m.insight)}
+          </div></div>
+          <div class="px">${tiles(m.tiles, false)}</div>
+          <div class="px" style="display:flex;flex-direction:column;gap:12px">
+            <h2 class="block-title">${m.listTitle}</h2>
+            ${matchRows(m.rows)}
+          </div>
+          <div class="px" style="padding-top:4px"><button class="primary" type="button">${m.button}</button></div>
+        </div>
+      </div></div>
+      ${indicator()}
+    </section>`;
+  }
+
+  function opponents() {
+    const o = D.opponents;
+    return `<section class="screen detail" data-screen="opponents" hidden>
+      ${status("light")}
+      <div class="scroll"><div class="scroll-inner">
+        ${hero(o)}
+        <div class="detail-pad">
+          <div class="px"><div class="sheet opponents">
+            <div class="groups">
+              <div class="ghead"><span class="g-name">Уровень соперника</span><span class="g-count">Побед</span><span class="g-pct">%</span></div>
+              ${o.table.map(row => `
+                <div class="grow${row.total ? " total" : ""}">
+                  <div class="g-name"><b>${row.name}</b>${row.range ? `<span>${row.range}</span>` : ""}</div>
+                  <div class="g-count">${row.count}</div>
+                  <div class="g-pct ${row.tone}">${row.percent}</div>
+                </div>`).join("")}
+            </div>
+            ${insight(o.insight)}
+          </div></div>
+          <div class="px" style="display:flex;flex-direction:column;gap:12px">
+            <h2 class="block-title">${o.listTitle}</h2>
+            ${matchRows(o.rows)}
+          </div>
+        </div>
+      </div></div>
+      ${indicator()}
+    </section>`;
+  }
+
+  function surface() {
+    const s = D.surface;
+    return `<section class="screen detail" data-screen="surface" hidden>
+      ${status("light")}
+      <div class="scroll"><div class="scroll-inner">
+        ${hero(s)}
+        <div class="detail-pad">
+          <div class="px"><div class="sheet surface">
+            ${periodRow()}
+            <div class="arcs">
+              <img src="assets/arc-track.svg" alt="" style="left:87.4px;top:-3.6px">
+              <img src="assets/arc-hard.svg" alt="" style="left:87.4px;top:-3.6px">
+              <img src="assets/arc-track-in.svg" alt="" style="left:109px;top:18px">
+              <img src="assets/arc-clay.svg" alt="" style="left:109px;top:18px">
+              <p class="val">${s.center}</p>
+              <p class="note">${s.centerNote}</p>
+              <div class="legend">
+                <i><img src="assets/dot-hard.svg" alt="">хард <b class="brand">64 %</b></i>
+                <i><img src="assets/dot-clay.svg" alt="">грунт <b class="clay">53 %</b></i>
+              </div>
+            </div>
+            ${insight(s.insight)}
+          </div></div>
+          <div class="px" style="display:flex;flex-direction:column;gap:12px">
+            <h2 class="block-title plain">${s.listTitle}</h2>
+            <div class="seg" data-surface-switch>
+              ${s.chips.map(chip => `<button type="button" data-surface="${chip.id}" class="${chip.selected ? "on" : ""}">${chip.label}</button>`).join("")}
+            </div>
+            <div id="surface-list">${matchRows(s.lists.hard)}</div>
+          </div>
+        </div>
+      </div></div>
+      ${indicator()}
+    </section>`;
+  }
+
+  stackEl.innerHTML = home() + wins() + matches() + opponents() + surface();
+
+  const periodMenu = document.createElement("div");
+  periodMenu.className = "period-menu";
+  periodMenu.hidden = true;
+  periodMenu.setAttribute("role", "menu");
+  periodMenu.innerHTML = D.periods.map(item =>
+    `<button type="button" role="menuitemradio" data-period="${item.id}" aria-checked="false">${item.menu}</button>`
+  ).join("");
+  let periodAnchor = null;
+
+  function periodCopy(period) {
+    return {
+      "home-delta": `▲ 0,4 ${period.zaShort}`,
+      "home-chart": `Динамика уровня NTRP ${period.za}`,
+      "home-insight": `Вырос на 0,4 ${period.za}, рост был почти каждый месяц`,
+      "home-win": `▲ 3 п.п. ${period.zaShort}`,
+      "home-matches": period.za,
+      "wins-caption": `побед ${period.za}`,
+      "wins-win": `59 % ${period.za}`,
+      "wins-loss": `41 % ${period.za}`,
+      "matches-caption": `матчей ${period.za}`
+    };
+  }
+
+  function applyPeriod(id) {
+    const period = D.periods.find(item => item.id === id);
+    if (!period) return;
+    D.periodId = id;
+    stackEl.querySelectorAll("[data-period-label]").forEach(node => {
+      node.textContent = period.label;
+    });
+    stackEl.querySelectorAll("[data-period-open]").forEach(node => {
+      node.firstChild.textContent = period.chip;
+    });
+    const copy = periodCopy(period);
+    stackEl.querySelectorAll("[data-period-copy]").forEach(node => {
+      const next = copy[node.dataset.periodCopy];
+      if (next) node.textContent = next;
+    });
+    periodMenu.querySelectorAll("[data-period]").forEach(button => {
+      const on = button.dataset.period === id;
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-checked", on ? "true" : "false");
+    });
+  }
+
+  function closePeriodMenu() {
+    periodMenu.hidden = true;
+    if (periodAnchor) periodAnchor.setAttribute("aria-expanded", "false");
+    periodAnchor = null;
+  }
+
+  function openPeriodMenu(anchor) {
+    const host = anchor.closest(".screen");
+    host.appendChild(periodMenu);
+    periodMenu.hidden = false;
+    periodAnchor = anchor;
+    anchor.setAttribute("aria-expanded", "true");
+    applyPeriod(D.periodId);
+    const hostBox = host.getBoundingClientRect();
+    const anchorBox = anchor.getBoundingClientRect();
+    const scale = hostBox.width / host.offsetWidth;
+    const menuHeight = periodMenu.offsetHeight;
+    let top = (anchorBox.bottom - hostBox.top) / scale + 8;
+    if (top + menuHeight > host.offsetHeight - 16) {
+      top = (anchorBox.top - hostBox.top) / scale - menuHeight - 8;
+    }
+    periodMenu.style.top = top + "px";
+    periodMenu.style.right = Math.max(16, (hostBox.right - anchorBox.right) / scale) + "px";
+  }
+
+  function screen(id) {
+    return stackEl.querySelector(`[data-screen="${id}"]`);
+  }
+
+  function bindBounce(root) {
+    const clipBox = document.querySelector(".screen-clip");
+    root.querySelectorAll(".scroll").forEach(scroller => {
+      const inner = scroller.querySelector(".scroll-inner");
+      let over = 0;
+      let raf = 0;
+      let finger = null;
+      const maxTop = () => Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      const resist = (px) => {
+        const sign = Math.sign(px);
+        const x = Math.abs(px);
+        return sign * (1 - 1 / (x / 140 + 1)) * 140;
+      };
+      const screenScale = () => {
+        const width = clipBox.getBoundingClientRect().width;
+        return width > 0 ? width / 390 : 1;
+      };
+      const paint = () => {
+        inner.style.transition = "none";
+        inner.style.transform = over ? `translate3d(0, ${resist(over)}px, 0)` : "";
+      };
+      const springBack = () => {
+        if (!over) return;
+        over = 0;
+        inner.style.transition = reduce ? "none" : "transform 340ms cubic-bezier(0.2, 0.9, 0.3, 1)";
+        inner.style.transform = "translate3d(0, 0, 0)";
+      };
+      const stopGlide = () => {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      };
+      const applyDelta = (dy) => {
+        if (over) {
+          const nextOver = over + dy;
+          if ((over > 0 && nextOver <= 0) || (over < 0 && nextOver >= 0)) {
+            over = 0;
+            paint();
+            scroller.scrollTop = Math.max(0, Math.min(maxTop(), scroller.scrollTop - nextOver));
+            return;
+          }
+          over = nextOver;
+          paint();
+          return;
+        }
+        const max = maxTop();
+        const next = scroller.scrollTop - dy;
+        if (next < 0) {
+          scroller.scrollTop = 0;
+          over = -next;
+          paint();
+        } else if (next > max) {
+          scroller.scrollTop = max;
+          over = max - next;
+          paint();
+        } else {
+          scroller.scrollTop = next;
+        }
+      };
+      const glide = (velocity) => {
+        if (reduce) {
+          springBack();
+          return;
+        }
+        stopGlide();
+        let vel = velocity;
+        let last = performance.now();
+        const frame = (now) => {
+          const dt = Math.min(34, now - last);
+          last = now;
+          vel *= Math.exp(-dt / 220);
+          applyDelta(vel * dt);
+          if (Math.abs(vel) < 0.02) {
+            if (over) springBack();
+            raf = 0;
+            return;
+          }
+          raf = requestAnimationFrame(frame);
+        };
+        raf = requestAnimationFrame(frame);
+      };
+
+      scroller.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || dragging || lock) return;
+        const rect = clipBox.getBoundingClientRect();
+        const x = (event.clientX - rect.left) * (390 / rect.width);
+        if (history.length > 1 && x <= 28) return;
+        event.preventDefault();
+        stopGlide();
+        if (over) springBack();
+        finger = {
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          lastY: event.clientY,
+          t: performance.now(),
+          v: 0,
+          moved: false
+        };
+      }, { passive: false });
+      scroller.addEventListener("pointermove", (event) => {
+        if (!finger || event.pointerId !== finger.id || dragging) return;
+        const dx = event.clientX - finger.x;
+        const dyTotal = event.clientY - finger.y;
+        if (!finger.moved) {
+          if (Math.abs(dx) < 6 && Math.abs(dyTotal) < 6) return;
+          finger.moved = true;
+          scroller.classList.add("is-dragging");
+          if (scroller.hasPointerCapture && !scroller.hasPointerCapture(event.pointerId)) {
+            scroller.setPointerCapture(event.pointerId);
+          }
+        }
+        event.preventDefault();
+        const now = performance.now();
+        const dt = Math.max(1, now - finger.t);
+        const dy = (event.clientY - finger.lastY) / screenScale();
+        finger.v = dy / dt;
+        finger.lastY = event.clientY;
+        finger.t = now;
+        applyDelta(dy);
+      });
+      const endFinger = (event) => {
+        if (!finger || event.pointerId !== finger.id) return;
+        const moved = finger.moved;
+        const vel = finger.v;
+        finger = null;
+        scroller.classList.remove("is-dragging");
+        if (!moved) return;
+        const block = (clickEvent) => {
+          clickEvent.preventDefault();
+          clickEvent.stopPropagation();
+          scroller.removeEventListener("click", block, true);
+        };
+        scroller.addEventListener("click", block, true);
+        if (over) {
+          if (Math.abs(vel) > 0.3) glide(vel);
+          else springBack();
+          return;
+        }
+        glide(vel);
+      };
+      scroller.addEventListener("pointerup", endFinger);
+      scroller.addEventListener("pointercancel", endFinger);
+
+      const thumb = document.createElement("i");
+      thumb.className = "ios-bar";
+      scroller.appendChild(thumb);
+      let hideThumb = 0;
+      const topbar = scroller.parentElement.querySelector(":scope > .topbar");
+      const navSlot = topbar && topbar.querySelector(".nav-slot");
+      const largeTitle = scroller.querySelector(".large-title");
+      const onHome = Boolean(scroller.closest(".is-home"));
+      const syncScroll = () => {
+        const y = scroller.scrollTop;
+        const max = maxTop();
+        if (topbar) {
+          const scrolled = y > 1;
+          if (topbar.classList.contains("is-scrolled") !== scrolled) topbar.classList.toggle("is-scrolled", scrolled);
+          if (navSlot) navSlot.style.opacity = reduce ? (y > 24 ? "1" : "0") : String(Math.max(0, Math.min(1, (y - 12) / 20)));
+          if (largeTitle) largeTitle.style.opacity = reduce ? "1" : String(1 - Math.min(1, y / 16));
+        }
+        if (max <= 1) return;
+        const bottomGap = onHome ? 130 : 24;
+        const track = Math.max(48, scroller.clientHeight - 70 - bottomGap);
+        const size = Math.max(32, track * (scroller.clientHeight / scroller.scrollHeight));
+        const travel = Math.max(1, track - size);
+        thumb.style.height = size + "px";
+        thumb.style.transform = `translate3d(0, ${(y / max) * travel}px, 0)`;
+        thumb.classList.add("on");
+        clearTimeout(hideThumb);
+        hideThumb = setTimeout(() => thumb.classList.remove("on"), 450);
+      };
+      scroller.addEventListener("scroll", syncScroll, { passive: true });
+
+      scroller.addEventListener("wheel", (event) => {
+        if (reduce || dragging || finger) return;
+        stopGlide();
+        const atTop = scroller.scrollTop <= 0;
+        const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+        const pulling = (atTop && event.deltaY < 0) || (atBottom && event.deltaY > 0) || over;
+        if (!pulling) {
+          if (over) springBack();
+          return;
+        }
+        event.preventDefault();
+        applyDelta(-event.deltaY / screenScale());
+        clearTimeout(scroller._spring);
+        scroller._spring = setTimeout(springBack, 80);
+      }, { passive: false });
+    });
+  }
+  bindBounce(stackEl);
+
+  function localRect(el, host) {
+    const hostBox = host.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const scale = hostBox.width / host.offsetWidth;
+    return {
+      top: (box.top - hostBox.top) / scale,
+      left: (box.left - hostBox.left) / scale,
+      width: box.width / scale,
+      height: box.height / scale
+    };
+  }
+
+  function clipAt(rect, p) {
+    const top = rect.top * p;
+    const left = rect.left * p;
+    const right = Math.max(0, 390 - rect.left - rect.width) * p;
+    const bottom = Math.max(0, 844 - rect.top - rect.height) * p;
+    const radius = 42 - 14 * p;
+    return `inset(${top}px ${right}px ${bottom}px ${left}px round ${radius}px)`;
+  }
+
+  function clearZoom(el) {
+    el.style.transition = "";
+    el.style.transform = "";
+    el.style.clipPath = "";
+  }
+
+  function push(id, sourceEl) {
+    if (lock || history[history.length - 1] === id) return;
+    const from = screen(history[history.length - 1]);
+    const to = screen(id);
+    to.hidden = false;
+    to.style.zIndex = "2";
+    from.style.zIndex = "1";
+    if (sourceEl) zoomFrom[id] = sourceEl;
+    if (reduce) {
+      from.hidden = true;
+      history.push(id);
+      return;
+    }
+    const rect = sourceEl ? localRect(sourceEl, from) : null;
+    lock = true;
+    to.style.transition = "none";
+    from.style.transition = "none";
+    if (!rect) {
+      to.style.transform = "translate3d(100%,0,0)";
+      requestAnimationFrame(() => {
+        to.style.transition = PUSH;
+        from.style.transition = PUSH;
+        to.style.transform = "translate3d(0,0,0)";
+        from.style.transform = "translate3d(-30%,0,0)";
+      });
+    } else {
+      to.style.clipPath = clipAt(rect, 1);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        to.style.transition = ZOOM;
+        from.style.transition = ZOOM_BACK;
+        to.style.clipPath = clipAt(rect, 0);
+        from.style.transform = "scale(0.94)";
+      }));
+    }
+    const done = (event) => {
+      if (done.ran) return;
+      if (event && event.target !== to) return;
+      if (event && event.propertyName && event.propertyName !== (rect ? "clip-path" : "transform")) return;
+      done.ran = true;
+      to.removeEventListener("transitionend", done);
+      clearZoom(to);
+      from.hidden = true;
+      clearZoom(from);
+      lock = false;
+    };
+    to.addEventListener("transitionend", done);
+    setTimeout(done, 540);
+    history.push(id);
+  }
+
+  function pop(fromDrag) {
+    if (history.length < 2 || lock) return;
+    const id = history.pop();
+    const from = screen(id);
+    const to = screen(history[history.length - 1]);
+    to.hidden = false;
+    to.style.zIndex = "1";
+    from.style.zIndex = "2";
+    if (reduce) {
+      from.hidden = true;
+      from.style.transform = "";
+      return;
+    }
+    const source = zoomFrom[id];
+    const rect = source && source.isConnected ? localRect(source, to) : null;
+    lock = true;
+    if (!fromDrag) {
+      if (rect) {
+        from.style.transition = "none";
+        to.style.transition = "none";
+        from.style.clipPath = clipAt(rect, 0);
+        to.style.transform = "scale(0.94)";
+        requestAnimationFrame(() => {
+          from.style.transition = ZOOM;
+          to.style.transition = ZOOM_BACK;
+          from.style.clipPath = clipAt(rect, 1);
+          to.style.transform = "scale(1)";
+        });
+      } else {
+        from.style.transition = PUSH;
+        to.style.transition = PUSH;
+        from.style.transform = "translate3d(100%,0,0)";
+        to.style.transform = "translate3d(0,0,0)";
+      }
+    }
+    const done = (event) => {
+      if (done.ran) return;
+      if (event && event.target !== from) return;
+      if (event && event.propertyName && event.propertyName !== (rect ? "clip-path" : "transform")) return;
+      done.ran = true;
+      from.removeEventListener("transitionend", done);
+      from.hidden = true;
+      clearZoom(from);
+      clearZoom(to);
+      lock = false;
+    };
+    from.addEventListener("transitionend", done);
+    setTimeout(done, 540);
+  }
+
+  function selectPoint(index) {
+    const point = D.home.months[index];
+    if (!point) return;
+    const chart = document.querySelector("[data-screen=home] .chart");
+    const halo = chart.querySelector(".halo");
+    const dot = chart.querySelector(".pdot");
+    const scrub = chart.querySelector(".scrub");
+    const tip = chart.querySelector(".tooltip");
+    halo.style.left = (point.x - 10) + "px";
+    halo.style.top = (point.y - 10) + "px";
+    dot.style.left = (point.x - 6) + "px";
+    dot.style.top = (point.y - 6) + "px";
+    scrub.style.left = (point.x - 0.5) + "px";
+    tip.querySelector("span").textContent = point.tip || point.label;
+    tip.querySelector("b").textContent = point.value;
+    const width = tip.offsetWidth;
+    tip.style.left = Math.max(8, Math.min(358 - width - 8, point.x - width / 2)) + "px";
+    tip.style.top = Math.max(8, point.y - 68) + "px";
+    chart.querySelectorAll(".mdot").forEach(node => {
+      node.classList.toggle("is-off", Number(node.dataset.dot) === index);
+    });
+    chart.parentElement.querySelectorAll(".months [data-point]").forEach(node => {
+      node.classList.toggle("on", Number(node.dataset.point) === index);
+    });
+  }
+
+  stackEl.addEventListener("click", (event) => {
+    const choice = event.target.closest("[data-period]");
+    if (choice) {
+      applyPeriod(choice.dataset.period);
+      closePeriodMenu();
+      return;
+    }
+    const opener = event.target.closest("[data-period-open]");
+    if (opener) {
+      if (periodAnchor === opener) closePeriodMenu();
+      else openPeriodMenu(opener);
+      return;
+    }
+    if (!periodMenu.hidden) {
+      closePeriodMenu();
+      return;
+    }
+    const pointBtn = event.target.closest("[data-point]");
+    if (pointBtn && pointBtn.closest("[data-screen=home]")) {
+      selectPoint(Number(pointBtn.dataset.point));
+      return;
+    }
+    const pushBtn = event.target.closest("[data-push]");
+    if (pushBtn) {
+      push(pushBtn.dataset.push, pushBtn);
+      return;
+    }
+    if (event.target.closest("[data-pop]")) pop(false);
+    const surfaceBtn = event.target.closest("[data-surface]");
+    if (surfaceBtn) {
+      stackEl.querySelectorAll("[data-surface]").forEach(btn => btn.classList.toggle("on", btn === surfaceBtn));
+      const list = D.surface.lists[surfaceBtn.dataset.surface];
+      document.getElementById("surface-list").innerHTML = matchRows(list);
+    }
+  });
+
+  const clip = document.querySelector(".screen-clip");
+  let drag = null;
+  clip.addEventListener("pointerdown", (event) => {
+    if (lock || history.length < 2 || event.button !== 0) return;
+    const rect = clip.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * (390 / rect.width);
+    if (x > 28) return;
+    const from = screen(history[history.length - 1]);
+    const to = screen(history[history.length - 2]);
+    const source = zoomFrom[history[history.length - 1]];
+    const zoomRect = source && source.isConnected ? localRect(source, to) : null;
+    to.hidden = false;
+    drag = { x: event.clientX, last: event.clientX, t: performance.now(), v: 0, p: 0, from, to, zoomRect };
+    dragging = true;
+    from.style.transition = "none";
+    to.style.transition = "none";
+    if (zoomRect) {
+      from.style.clipPath = clipAt(zoomRect, 0);
+      to.style.transform = "scale(0.94)";
+    } else {
+      to.style.transform = "translate3d(-30%,0,0)";
+    }
+    clip.setPointerCapture(event.pointerId);
+  });
+  clip.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    const now = performance.now();
+    const dx = Math.max(0, event.clientX - drag.x);
+    const dt = Math.max(16, now - drag.t);
+    drag.v = (event.clientX - drag.last) / dt;
+    drag.last = event.clientX;
+    drag.t = now;
+    if (drag.zoomRect) {
+      const p = Math.min(1, dx / 240);
+      drag.p = p;
+      drag.from.style.clipPath = clipAt(drag.zoomRect, p);
+      drag.to.style.transform = `scale(${0.94 + 0.06 * p})`;
+      return;
+    }
+    const p = Math.min(1, dx / 390);
+    drag.from.style.transform = `translate3d(${dx}px,0,0)`;
+    drag.to.style.transform = `translate3d(${-30 * (1 - p)}%,0,0)`;
+  });
+  function endDrag(event) {
+    if (!drag) return;
+    const dx = Math.max(0, event.clientX - drag.x);
+    const zooming = Boolean(drag.zoomRect);
+    const shouldPop = zooming ? (drag.p > 0.35 || drag.v > 0.45) : (dx > 120 || drag.v > 0.45);
+    dragging = false;
+    const from = drag.from;
+    const to = drag.to;
+    const zoomRect = drag.zoomRect;
+    drag = null;
+    if (shouldPop) {
+      lock = true;
+      if (zooming) {
+        from.style.transition = ZOOM;
+        to.style.transition = ZOOM_BACK;
+        from.style.clipPath = clipAt(zoomRect, 1);
+        to.style.transform = "scale(1)";
+      } else {
+        from.style.transition = PUSH;
+        to.style.transition = PUSH;
+        from.style.transform = "translate3d(100%,0,0)";
+        to.style.transform = "translate3d(0,0,0)";
+      }
+      history.pop();
+      const done = (event) => {
+        if (done.ran) return;
+        if (event && event.target !== from) return;
+        done.ran = true;
+        from.removeEventListener("transitionend", done);
+        from.hidden = true;
+        clearZoom(from);
+        clearZoom(to);
+        lock = false;
+      };
+      from.addEventListener("transitionend", done);
+      setTimeout(done, 540);
+    } else if (zooming) {
+      from.style.transition = ZOOM;
+      to.style.transition = ZOOM_BACK;
+      from.style.clipPath = clipAt(zoomRect, 0);
+      to.style.transform = "scale(0.94)";
+      const done = (event) => {
+        if (done.ran) return;
+        if (event && event.target !== from) return;
+        done.ran = true;
+        from.removeEventListener("transitionend", done);
+        clearZoom(from);
+        to.hidden = true;
+        clearZoom(to);
+      };
+      from.addEventListener("transitionend", done);
+      setTimeout(done, 540);
+    } else {
+      from.style.transition = PUSH;
+      to.style.transition = PUSH;
+      from.style.transform = "translate3d(0,0,0)";
+      to.style.transform = "translate3d(-30%,0,0)";
+      const done = () => {
+        from.removeEventListener("transitionend", done);
+        to.hidden = true;
+        to.style.transform = "";
+      };
+      from.addEventListener("transitionend", done);
+    }
+  }
+  clip.addEventListener("pointerup", endDrag);
+  clip.addEventListener("pointercancel", endDrag);
+
+  screen("home").hidden = false;
+})();
+</script>
+</body>
+</html>
