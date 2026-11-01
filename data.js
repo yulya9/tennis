@@ -9,6 +9,41 @@ window.MYTENNIS = {
     avatar: "assets/avatar.png"
   },
   periodId: "6",
+  months12: ["Дек", "Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя"],
+  loc: { "Дек": "в декабре", "Янв": "в январе", "Фев": "в феврале", "Мар": "в марте", "Апр": "в апреле", "Май": "в мае", "Июн": "в июне", "Июл": "в июле", "Авг": "в августе", "Сен": "в сентябре", "Окт": "в октябре", "Ноя": "в ноябре" },
+  series: {
+    ntrp: [3.4, 3.4, 3.5, 3.5, 3.5, 3.6, 3.6, 3.7, 3.8, 3.8, 3.9, 4.0],
+    matches: [5, 4, 6, 7, 6, 5, 6, 10, 7, 6, 5, 5]
+  },
+  stats: {
+    "3": { ntrpDelta: "0,2", winsDelta: "+4 п.п.", wins: { w: 10, t: 16 }, bars: [75, 70, 58, 56, 45], opp: [{ w: 5, t: 6 }, { w: 3, t: 6 }, { w: 2, t: 4 }], surface: { hard: 66, clay: 50 } },
+    "6": { ntrpDelta: "0,4", winsDelta: "+3 п.п.", wins: { w: 23, t: 39 }, bars: [72, 67, 55, 54, 41], opp: [{ w: 6, t: 7 }, { w: 14, t: 24 }, { w: 3, t: 8 }], surface: { hard: 64, clay: 53 } },
+    "12": { ntrpDelta: "0,6", winsDelta: "+5 п.п.", wins: { w: 40, t: 72 }, bars: [70, 64, 53, 52, 40], opp: [{ w: 17, t: 20 }, { w: 18, t: 37 }, { w: 5, t: 15 }], surface: { hard: 61, clay: 55 } }
+  },
+  barDefs: [
+    { label: "Первый сет", key: "первый сет", plural: false },
+    { label: "Тай-брейки", key: "тай-брейки", plural: true },
+    { label: "Решающий сет", key: "решающий сет", plural: false },
+    { label: "Геймы", key: "геймы", plural: true },
+    { label: "Камбэки", key: "камбэки", plural: true }
+  ],
+  oppDefs: [
+    { name: "Слабее вас", range: "до 3,5", tone: "success" },
+    { name: "Равные", range: "3,5–4,5", tone: "brand" },
+    { name: "Сильнее вас", range: "выше 4,5", tone: "danger" }
+  ],
+  pool: [
+    { name: "Иванов А.", meta: "Лужники, хард", score: "6–4 7–6(5)", date: "30 окт", m: 10, day: 30, result: "win", surface: "hard", strong: false },
+    { name: "Морозов П.", meta: "Спартак, грунт", score: "4–6 6–7(4)", date: "27 окт", m: 10, day: 27, result: "loss", surface: "clay", strong: true },
+    { name: "Петров С.", meta: "Спартак, грунт", score: "3–6 4–6", date: "18 окт", m: 10, day: 18, result: "loss", surface: "clay", strong: false },
+    { name: "Сидоров К.", meta: "Лужники, хард", score: "6–2 6–3", date: "3 окт", m: 10, day: 3, result: "win", surface: "hard", strong: false },
+    { name: "Козлов Д.", meta: "Лужники, хард", score: "4–6 5–7", date: "2 окт", m: 10, day: 2, result: "loss", surface: "hard", strong: false },
+    { name: "Козлов Д.", meta: "Лужники, хард", score: "7–5 6–4", date: "12 сен", m: 9, day: 12, result: "win", surface: "hard", strong: true },
+    { name: "Волков А.", meta: "Спартак, грунт", score: "3–6 2–6", date: "20 авг", m: 8, day: 20, result: "loss", surface: "clay", strong: true },
+    { name: "Лебедев Н.", meta: "Лужники, хард", score: "6–7(3) 4–6", date: "14 июл", m: 7, day: 14, result: "loss", surface: "hard", strong: true },
+    { name: "Орлов Р.", meta: "Спартак, грунт", score: "6–3 3–6 7–6(4)", date: "9 июн", m: 6, day: 9, result: "win", surface: "clay", strong: true },
+    { name: "Беляев М.", meta: "Лужники, хард", score: "5–7 6–4 6–3", date: "22 мар", m: 3, day: 22, result: "win", surface: "hard", strong: true }
+  ],
   periods: [
     { id: "3", menu: "3 месяца", chip: "3 мес", label: "Сен 2026 – Ноя 2026", za: "за 3 месяца", zaShort: "за 3 мес." },
     { id: "6", menu: "6 месяцев", chip: "6 мес", label: "Июн 2026 – Ноя 2026", za: "за 6 месяцев", zaShort: "за 6 мес." },

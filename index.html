@@ -190,7 +190,6 @@
   .avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .avatar-btn:active { transform: scale(0.92); }
   .chart .mdot { position: absolute; width: 8px; height: 8px; }
-  .chart .tooltip span { display: none; }
   .is-home .panel { background: var(--cobalt); padding-bottom: 20px; }
   .panel .chart-caption { color: rgba(255, 255, 255, 0.82); }
   .panel .chart .ylab { color: rgba(255, 255, 255, 0.82); }
@@ -870,6 +869,36 @@
       animation: none !important;
     }
   }
+
+  /* график: общий вид на синей карточке, на белой он переопределён ниже */
+  .chart {
+    --lc-line: #fff; --lc-sw: 4px; --lc-dot: #eaff00; --lc-ring: #fff;
+    --lc-halo: rgba(255, 255, 255, 0.2); --lc-grid: #fff; --lc-grid-o: 0.22;
+    --lc-area: #fff; --lc-area-o: 0.28; --lc-ylab: rgba(255, 255, 255, 0.82);
+    --lc-scrub: rgba(255, 255, 255, 0.3);
+  }
+  .sheet .chart {
+    --lc-line: #2f3dff; --lc-sw: 2px; --lc-dot: #2f3dff; --lc-ring: #2e3dff;
+    --lc-halo: rgba(47, 61, 255, 0.18); --lc-grid: #0d0d0d; --lc-grid-o: 0.14;
+    --lc-area: #2f3dff; --lc-area-o: 0.22; --lc-ylab: var(--tertiary);
+    --lc-scrub: rgba(13, 13, 13, 0.28);
+  }
+  [data-slot="home-chart"], [data-slot="matches-chart"], [data-slot="wins-body"] { display: contents; }
+  .chart .plot { position: absolute; left: 0; top: 0; display: block; overflow: visible; }
+  .chart .ln { stroke: var(--lc-line); stroke-width: var(--lc-sw); stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .chart .mdot { border-radius: 50%; background: var(--lc-dot); }
+  .chart .halo { border-radius: 50%; background: var(--lc-halo); }
+  .chart .pdot { box-sizing: border-box; border-radius: 50%; background: var(--lime); border: 2px solid var(--lc-ring); }
+  .chart .scrub { background: var(--lc-scrub); }
+  .chart .ylab { color: var(--lc-ylab); }
+  .chart .tooltip { white-space: nowrap; }
+  .panel .chart .tooltip span, .chart[data-chart="home"] .tooltip span { display: none; }
+  .months button { transform: translateX(-50%); }
+  .months.dense button { font-size: 11px; }
+  .arcs .arcs-svg { position: absolute; left: 0; top: 0; display: block; overflow: visible; }
+  .arcs .val, .arcs .note { left: 0; right: 0; text-align: center; }
+  .arcs .legend { left: 0; right: 0; justify-content: center; }
+  .groups { overflow: hidden; }
 </style>
 </head>
 <body>
@@ -916,8 +945,8 @@
     return `<div class="home-indicator"><i></i></div>`;
   }
 
-  function insight(text, copy) {
-    return `<div class="insight"><div class="mark"><img src="assets/insight.svg" alt=""></div><p${copy ? ` data-period-copy="${copy}"` : ""}>${text}</p></div>`;
+  function insight(slot, text) {
+    return `<div class="insight"><div class="mark"><img src="assets/insight.svg" alt=""></div><p data-slot="${slot}">${text}</p></div>`;
   }
 
   function tiles(items, linked) {
@@ -931,7 +960,7 @@
           </div>
           <div>
             <strong>${t.value}</strong>
-            <em class="${t.noteTone || ""}"${t.noteCopy ? ` data-period-copy="${t.noteCopy}"` : ""}>${t.note}</em>
+            <em class="${t.noteTone || ""}">${t.note}</em>
           </div>
         </${linked ? "button" : "div"}>`).join("")}</div>`).join("")}</div>`;
   }
@@ -968,10 +997,327 @@
     </div>`;
   }
 
-  function hero(block) {
+  /* ---------- данные периода ---------- */
+  const num = n => String(n).replace(".", ",");
+  const pct = (w, t) => Math.round(w / t * 100);
+  const plural = (n, a, b, c) => {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return a;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return b;
+    return c;
+  };
+
+  function model(id) {
+    const n = Number(id);
+    const per = D.periods.find(p => p.id === id) || D.periods[1];
+    const st = D.stats[id];
+    const labels = D.months12.slice(-n);
+    const ntrp = D.series.ntrp.slice(-n);
+    const cnt = D.series.matches.slice(-n);
+    const total = cnt.reduce((a, b) => a + b, 0);
+    const peak = Math.max(...cnt);
+    const peakI = cnt.indexOf(peak);
+    const winPct = pct(st.wins.w, st.wins.t);
+    const barAvg = Math.round(st.bars.reduce((a, b) => a + b, 0) / st.bars.length);
+    const best = st.surface.hard >= st.surface.clay ? "hard" : "clay";
+    return { id, n, per, st, labels, ntrp, cnt, total, peak, peakI, winPct, barAvg, best, minM: 12 - n, avg: (Math.round(total / n * 10) / 10).toFixed(1) };
+  }
+
+  function pickMatches(vm, filter) {
+    return D.pool
+      .filter(r => r.m >= vm.minM && filter(r))
+      .sort((a, b) => b.m - a.m || b.day - a.day)
+      .slice(0, 3);
+  }
+
+  function homeInsight(vm) {
+    const v = vm.ntrp;
+    const gains = v.slice(1).map((x, i) => Math.round((x - v[i]) * 10));
+    const up = gains.filter(g => g > 0).length;
+    const head = `Вырос на ${vm.st.ntrpDelta} ${vm.per.za}`;
+    if (up === gains.length) return `${head}, рост каждый месяц`;
+    if (up / gains.length >= 0.75) return `${head}, рост был почти каждый месяц`;
+    const total = v[v.length - 1] - v[0];
+    for (let k = 1; k < v.length; k++) {
+      if (v[v.length - 1] - v[v.length - 1 - k] >= total * 0.66 - 1e-9) {
+        return `${head}, основной рост пришёлся на последние ${k} ${plural(k, "месяц", "месяца", "месяцев")}`;
+      }
+    }
+    return head;
+  }
+
+  /* ---------- линейный график ---------- */
+  const charts = {};
+
+  function ticksFor(min, max, steps) {
+    for (const step of steps) {
+      for (const count of [4, 5]) {
+        const bottom = Math.floor(min / step + 1e-9) * step;
+        const top = bottom + (count - 1) * step;
+        if (top >= max + step * 0.5 - 1e-9) return { bottom, step, count };
+      }
+    }
+    const step = steps[steps.length - 1];
+    return { bottom: Math.floor(min / step) * step, step, count: 5 };
+  }
+
+  function smooth(p) {
+    let d = `M ${p[0].x.toFixed(1)} ${p[0].y.toFixed(1)}`;
+    for (let i = 0; i < p.length - 1; i++) {
+      const a = p[i - 1] || p[i], b = p[i], c = p[i + 1], e = p[i + 2] || c;
+      d += ` C ${(b.x + (c.x - a.x) / 6).toFixed(1)} ${(b.y + (c.y - a.y) / 6).toFixed(1)} ${(c.x - (e.x - b.x) / 6).toFixed(1)} ${(c.y - (e.y - b.y) / 6).toFixed(1)} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`;
+    }
+    return d;
+  }
+
+  function lineChart(id, labels, values, o) {
+    const t = ticksFor(Math.min(...values), Math.max(...values), o.steps);
+    const top = t.bottom + (t.count - 1) * t.step;
+    const X0 = 25.4, X1 = 332.6, GAP = 52.3, Y0 = 31.5, n = values.length;
+    const pts = values.map((v, i) => ({
+      label: labels[i],
+      text: o.text(v),
+      tip: o.tip ? o.tip(i) : "",
+      x: X0 + i * (X1 - X0) / (n - 1),
+      y: Y0 + (top - v) / t.step * GAP
+    }));
+    charts[id] = { pts, sel: o.select };
+    const line = smooth(pts);
+    const area = `${line} L ${pts[n - 1].x.toFixed(1)} 260 L ${pts[0].x.toFixed(1)} 260 Z`;
+    const grid = Array.from({ length: t.count }, (_, k) => `<path d="M16 ${(Y0 + k * GAP).toFixed(1)}H342" stroke="url(#gr-${id})"/>`).join("");
+    const ylabs = Array.from({ length: t.count }, (_, k) => {
+      const val = top - k * t.step;
+      return `<p class="ylab" style="top:${(Y0 + k * GAP + 3).toFixed(1)}px">${o.tick(val)}</p>`;
+    }).join("");
+    const dense = n > 8 ? " dense" : "";
+    return `<div class="chart" data-chart="${id}">
+        <svg class="plot" width="358" height="260" viewBox="0 0 358 260" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="gr-${id}" gradientUnits="userSpaceOnUse" x1="16" y1="0" x2="342" y2="0">
+              <stop offset="0" style="stop-color:var(--lc-grid);stop-opacity:0"/>
+              <stop offset="0.2" style="stop-color:var(--lc-grid);stop-opacity:var(--lc-grid-o)"/>
+              <stop offset="0.8" style="stop-color:var(--lc-grid);stop-opacity:var(--lc-grid-o)"/>
+              <stop offset="1" style="stop-color:var(--lc-grid);stop-opacity:0"/>
+            </linearGradient>
+            <linearGradient id="ar-${id}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" style="stop-color:var(--lc-area);stop-opacity:var(--lc-area-o)"/>
+              <stop offset="1" style="stop-color:var(--lc-area);stop-opacity:0"/>
+            </linearGradient>
+          </defs>
+          ${grid}
+          <path d="${area}" fill="url(#ar-${id})"/>
+          <path class="ln" d="${line}"/>
+        </svg>
+        ${pts.map((p, i) => `<i class="mdot" data-dot="${i}" style="left:${(p.x - 4).toFixed(1)}px;top:${(p.y - 4).toFixed(1)}px"></i>`).join("")}
+        <i class="scrub"></i><i class="halo"></i><i class="pdot"></i>
+        ${ylabs}
+        <div class="tooltip"><span></span><b></b></div>
+        ${pts.map((p, i) => `<button class="hit" type="button" data-cp="${id}:${i}" style="left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px" aria-label="${p.tip || p.label} ${p.text}"></button>`).join("")}
+      </div>
+      <div class="months${dense}">
+        ${pts.map((p, i) => `<button type="button" data-cp="${id}:${i}" style="left:${(p.x - 16).toFixed(1)}px">${p.label}</button>`).join("")}
+      </div>`;
+  }
+
+  function selectPoint(id, index) {
+    const c = charts[id];
+    const chart = document.querySelector(`[data-chart="${id}"]`);
+    if (!c || !chart || !c.pts[index]) return;
+    const p = c.pts[index];
+    const q = sel => chart.querySelector(sel);
+    q(".halo").style.left = (p.x - 10) + "px";
+    q(".halo").style.top = (p.y - 10) + "px";
+    q(".pdot").style.left = (p.x - 6) + "px";
+    q(".pdot").style.top = (p.y - 6) + "px";
+    const scrub = q(".scrub");
+    const sTop = Math.max(0, p.y - 27);
+    scrub.style.left = (p.x - 0.5) + "px";
+    scrub.style.top = sTop + "px";
+    scrub.style.height = (256 - sTop) + "px";
+    const tip = q(".tooltip");
+    tip.querySelector("span").textContent = p.tip || p.label;
+    tip.querySelector("b").textContent = p.text;
+    const showMonth = id !== "home";
+    const width = tip.offsetWidth || (32 + 8.6 * (p.text.length + (showMonth ? (p.tip || p.label).length : 0)) + (showMonth ? 8 : 0));
+    tip.style.left = Math.max(8, Math.min(358 - width - 8, p.x - width / 2)) + "px";
+    tip.style.top = Math.max(8, p.y - 68) + "px";
+    chart.querySelectorAll(".mdot").forEach(node => {
+      node.classList.toggle("is-off", Number(node.dataset.dot) === index);
+    });
+    chart.parentElement.querySelectorAll(".months [data-cp]").forEach(node => {
+      node.classList.toggle("on", Number(node.dataset.cp.split(":")[1]) === index);
+    });
+    c.cur = index;
+  }
+
+  function refreshCharts() {
+    Object.keys(charts).forEach(id => selectPoint(id, charts[id].cur != null ? charts[id].cur : charts[id].sel));
+  }
+
+  /* ---------- дуги покрытия ---------- */
+  function arcPath(cx, cy, r, sweep) {
+    const a0 = 135 * Math.PI / 180;
+    const a1 = (135 + Math.max(1, sweep)) * Math.PI / 180;
+    const f = x => x.toFixed(2);
+    return `M ${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${f(cx + r * Math.cos(a1))} ${f(cy + r * Math.sin(a1))}`;
+  }
+
+  function arcsSvg(hard, clay) {
+    const cx = 179, cy = 88;
+    const stroke = `stroke-width="16" stroke-linecap="round" fill="none"`;
+    return `<svg class="arcs-svg" width="358" height="238" viewBox="0 0 358 238" aria-hidden="true">
+      <defs>
+        <linearGradient id="arc-h" gradientUnits="userSpaceOnUse" x1="0" y1="4.4" x2="0" y2="147.4"><stop stop-color="#2F3DFF"/><stop offset="1" stop-color="#2F3DFF" stop-opacity="0.1"/></linearGradient>
+        <linearGradient id="arc-c" gradientUnits="userSpaceOnUse" x1="185" y1="26" x2="140.5" y2="132"><stop stop-color="#FF5900"/><stop offset="1" stop-color="#FF5900" stop-opacity="0.1"/></linearGradient>
+      </defs>
+      <path d="${arcPath(cx, cy, 83.6, 270)}" ${stroke} stroke="#0D0D0D" stroke-opacity="0.04"/>
+      <path d="${arcPath(cx, cy, 83.6, hard / 100 * 270)}" ${stroke} stroke="url(#arc-h)"/>
+      <path d="${arcPath(cx, cy, 62, 270)}" ${stroke} stroke="#0D0D0D" stroke-opacity="0.04"/>
+      <path d="${arcPath(cx, cy, 62, clay / 100 * 270)}" ${stroke} stroke="url(#arc-c)"/>
+    </svg>`;
+  }
+
+  /* ---------- слоты, которые пересобираются при смене периода ---------- */
+  const slots = {
+    "home-delta": vm => `▲ ${vm.st.ntrpDelta} ${vm.per.zaShort}`,
+    "home-caption": vm => `Динамика уровня NTRP ${vm.per.za}`,
+    "home-chart": vm => lineChart("home", vm.labels, vm.ntrp, {
+      steps: [0.1, 0.2, 0.5],
+      text: v => v.toFixed(1),
+      tick: v => v.toFixed(1),
+      tip: i => (i === vm.n - 1 ? "Сегодня" : ""),
+      select: vm.n - 1
+    }),
+    "home-insight": vm => homeInsight(vm),
+    "home-tiles": vm => tiles([
+      { id: "wins", icon: "assets/icon-trophy.svg", title: "Победы", value: `${vm.winPct} %`, note: `▲ ${vm.st.winsDelta.replace("+", "")} ${vm.per.zaShort}`, noteTone: "success" },
+      { id: "matches", icon: "assets/icon-matches.svg", title: "Матчи", value: String(vm.total), note: vm.per.za, noteTone: "secondary" },
+      { id: "opponents", icon: "assets/icon-opponents.svg", title: "Соперники", value: `${vm.st.opp[2].w} из ${vm.st.opp[2].t}`, note: "побед против сильных", noteTone: "secondary" },
+      { id: "surface", icon: "assets/icon-surface.svg", title: "Покрытие", value: vm.best === "hard" ? "Хард" : "Грунт", note: `лучшее, ${vm.st.surface[vm.best]} % побед`, noteTone: "secondary" }
+    ], true),
+
+    "matches-value": vm => String(vm.total),
+    "matches-caption": vm => `матчей ${vm.per.za}`,
+    "matches-chart": vm => lineChart("matches", vm.labels, vm.cnt, {
+      steps: [1, 2, 5, 10],
+      text: v => `${v} ${plural(v, "матч", "матча", "матчей")}`,
+      tick: v => String(Math.round(v)),
+      tip: i => vm.labels[i],
+      select: vm.peakI
+    }),
+    "matches-insight": vm => `Пик ${D.loc[vm.labels[vm.peakI]]}: ${vm.peak} ${plural(vm.peak, "матч", "матча", "матчей")}, в среднем ${num(vm.avg)} в месяц`,
+    "matches-tiles": vm => tiles([
+      { icon: "assets/icon-avg.svg", title: "В среднем", value: num(vm.avg), note: "матча в месяц" },
+      { icon: "assets/icon-max.svg", title: "Максимум", value: String(vm.peak), note: D.loc[vm.labels[vm.peakI]] }
+    ], false),
+
+    "wins-value": vm => `${vm.winPct} %`,
+    "wins-delta": vm => vm.st.winsDelta,
+    "wins-caption": vm => `побед ${vm.per.za}`,
+    "wins-body": vm => {
+      const bars = D.barDefs.map((def, i) => {
+        const value = vm.st.bars[i];
+        const diff = value - vm.barAvg;
+        const width = Math.max(4, Math.abs(diff) * 7.5);
+        const side = diff >= 0 ? "right" : "left";
+        const left = side === "right" ? 179 : 179 - width;
+        return `
+          <div class="metric">
+            <div class="lab"><span>${def.label}</span><b>${value} %</b></div>
+            <div class="track">
+              <i class="base"></i>
+              <i class="fill ${side}" style="left:${(left / 358) * 100}%;width:${(width / 358) * 100}%"></i>
+              <i class="tick"></i>
+            </div>
+          </div>`;
+      }).join("");
+      return `<div class="scale"><span>слабее</span><span>среднее по метрикам ${vm.barAvg} %</span><span>сильнее</span></div>${bars}`;
+    },
+    "wins-insight": vm => {
+      const v = vm.st.bars;
+      const hi = v.indexOf(Math.max(...v));
+      const lo = v.indexOf(Math.min(...v));
+      const dh = D.barDefs[hi], dl = D.barDefs[lo];
+      return `Сильнее всего ${dh.key}: ${v[hi]} %. Слабее всего ${dl.key}: ${v[lo]} %, над ${dl.plural ? "ними" : "ним"} стоит поработать`;
+    },
+    "wins-tiles": vm => tiles([
+      { icon: "assets/icon-trophy.svg", title: "Победы", value: `${vm.st.wins.w} из ${vm.st.wins.t}`, note: `${vm.winPct} % ${vm.per.za}` },
+      { icon: "assets/icon-max.svg", title: "Поражения", value: `${vm.st.wins.t - vm.st.wins.w} из ${vm.st.wins.t}`, note: `${100 - vm.winPct} % ${vm.per.za}` }
+    ], false),
+
+    "opp-caption": vm => "побед против сильнее вас",
+    "opp-value": vm => `${pct(vm.st.opp[2].w, vm.st.opp[2].t)} %`,
+    "opp-table": vm => {
+      const rows = D.oppDefs.map((def, i) => {
+        const r = vm.st.opp[i];
+        return `
+          <div class="grow">
+            <div class="g-name"><b>${def.name}</b><span>${def.range}</span></div>
+            <div class="g-count">${r.w} из ${r.t}</div>
+            <div class="g-pct ${def.tone}">${pct(r.w, r.t)} %</div>
+          </div>`;
+      }).join("");
+      return `
+        <div class="ghead"><span class="g-name">Уровень соперника</span><span class="g-count">Побед</span><span class="g-pct">%</span></div>
+        ${rows}
+        <div class="grow total">
+          <div class="g-name"><b>Всего</b></div>
+          <div class="g-count">${vm.st.wins.w} из ${vm.st.wins.t}</div>
+          <div class="g-pct ink">${vm.winPct} %</div>
+        </div>`;
+    },
+    "opp-insight": vm => `Против слабых вы выигрываете ${vm.st.opp[0].w} из ${vm.st.opp[0].t}, против сильных ${vm.st.opp[2].w} из ${vm.st.opp[2].t}. Больше всего места для роста`,
+    "opp-list": vm => matchRows(pickMatches(vm, r => r.strong)),
+
+    "surf-value": vm => (vm.best === "hard" ? "Хард" : "Грунт"),
+    "surf-caption": vm => `лучшее покрытие, ${vm.st.surface[vm.best]} % побед`,
+    "surf-arcs": vm => {
+      const s = vm.st.surface;
+      return `${arcsSvg(s.hard, s.clay)}
+        <p class="val">${s[vm.best]} %</p>
+        <p class="note">${vm.best === "hard" ? "хард" : "грунт"}</p>
+        <div class="legend">
+          <i><img src="assets/dot-hard.svg" alt="">хард <b class="brand">${s.hard} %</b></i>
+          <i><img src="assets/dot-clay.svg" alt="">грунт <b class="clay">${s.clay} %</b></i>
+        </div>`;
+    },
+    "surf-insight": vm => {
+      const s = vm.st.surface;
+      const win = vm.best === "hard" ? "харде" : "грунте";
+      const lose = vm.best === "hard" ? "грунте" : "харде";
+      const other = vm.best === "hard" ? s.clay : s.hard;
+      return `На ${win} вы выигрываете чаще: ${s[vm.best]} % против ${other} % на ${lose}`;
+    },
+    "surf-list": vm => {
+      const active = stackEl.querySelector("[data-surface].on");
+      const which = active ? active.dataset.surface : "hard";
+      return matchRows(pickMatches(vm, r => r.surface === which));
+    }
+  };
+
+  function slot(name, vm, tag, cls) {
+    return `<${tag || "span"} data-slot="${name}"${cls ? ` class="${cls}"` : ""}>${slots[name](vm)}</${tag || "span"}>`;
+  }
+
+  function fillSlots(vm, only) {
+    stackEl.querySelectorAll("[data-slot]").forEach(node => {
+      if (only && node.dataset.slot !== only) return;
+      const fn = slots[node.dataset.slot];
+      if (fn) node.innerHTML = fn(vm);
+    });
+    refreshChartsDefault();
+  }
+
+  function refreshChartsDefault() {
+    Object.keys(charts).forEach(id => { charts[id].cur = null; });
+    refreshCharts();
+  }
+
+  function hero(block, key, vm) {
     const chip = block.chip
       ? `<button class="chip-on" type="button" data-period-open aria-haspopup="menu" aria-expanded="false">${block.chip}<img src="assets/chevron-updown-light.svg" alt=""></button>`
       : "";
+    const delta = block.deltaSlot ? `<span class="pill" data-slot="${block.deltaSlot}">${slots[block.deltaSlot](vm)}</span>` : "";
     return `<div class="dhero-stick">
       <div class="status-space"></div>
       <div class="dnav">${backBtn()}<h1>${block.title}</h1></div>
@@ -979,18 +1325,19 @@
     <div class="dhero-rest">
       <div class="dvalue">
         <div class="lead">
-          <p class="display">${block.value}</p>
-          ${block.delta ? `<span class="pill">${block.delta}</span>` : ""}
+          <p class="display" data-slot="${key}-value">${slots[key + "-value"](vm)}</p>
+          ${delta}
         </div>
         ${chip}
       </div>
-      <p class="dcaption"${block.captionCopy ? ` data-period-copy="${block.captionCopy}"` : ""}>${block.caption}</p>
+      <p class="dcaption" data-slot="${key}-caption">${slots[key + "-caption"](vm)}</p>
     </div>`;
   }
 
+  const vm0 = model(D.periodId);
+
   function home() {
     const h = D.home;
-    const monthLeft = [-8, 49, 113, 173, 236, 293];
     return `<section class="screen is-home" data-screen="home">
       <div class="topbar">
         ${status("dark")}
@@ -1010,31 +1357,17 @@
           </div>
           <div class="level-info">
             <p>${h.levelCaption}</p>
-            <span class="pill" data-period-copy="${h.deltaCopy}">${h.delta}</span>
+            ${slot("home-delta", vm0, "span", "pill")}
           </div>
         </div>
         <div class="px">
           <div class="panel">
-            <p class="chart-caption" data-period-copy="${h.chartCopy}">${h.chartTitle}</p>
-            <div class="chart">
-              <img class="area" src="assets/area.svg?v=3" alt="">
-              <img class="grid" src="assets/grid.svg?v=3" alt="">
-              <img class="line" src="assets/line.svg?v=3" alt="">
-              ${h.months.map((m, i) => `<img class="mdot${m.selected ? " is-off" : ""}" data-dot="${i}" style="left:${m.x - 4}px;top:${m.y - 4}px" src="assets/month-dot.svg?v=3" alt="">`).join("")}
-              <i class="scrub"></i>
-              <img class="halo" src="assets/peak-halo.svg?v=3" alt="">
-              <img class="pdot" src="assets/peak-dot.svg?v=3" alt="">
-              ${h.yLabels.map((y, i) => `<p class="ylab" style="top:${34.5 + i * 52.3}px">${y}</p>`).join("")}
-              <div class="tooltip"><span>${h.tooltip.month}</span><b>${h.tooltip.value}</b></div>
-              ${h.months.map((m, i) => `<button class="hit" type="button" data-point="${i}" style="left:${m.x}px;top:${m.y}px" aria-label="${m.tip || m.label} ${m.value}"></button>`).join("")}
-            </div>
-            <div class="months">
-              ${h.months.map((m, i) => `<button class="${m.selected ? "on" : ""}" type="button" data-point="${i}" style="left:${monthLeft[i]}px">${m.label}</button>`).join("")}
-            </div>
-            ${insight(h.insight, h.insightCopy)}
+            ${slot("home-caption", vm0, "p", "chart-caption")}
+            <div data-slot="home-chart">${slots["home-chart"](vm0)}</div>
+            ${insight("home-insight", slots["home-insight"](vm0))}
           </div>
         </div>
-        <div class="px">${tiles(h.tiles, true)}</div>
+        <div class="px" data-slot="home-tiles">${slots["home-tiles"](vm0)}</div>
       </div></div></div>
       <nav class="tabbar">${D.tabs.map(t => `
         <button class="tab${t.active ? " on" : ""}" type="button">
@@ -1051,23 +1384,14 @@
     return `<section class="screen detail" data-screen="wins" hidden>
       ${status("light")}
       <div class="scroll"><div class="scroll-inner">
-        ${hero(w)}
+        ${hero({ title: w.title, deltaSlot: "wins-delta" }, "wins", vm0)}
         <div class="detail-pad">
           <div class="px"><div class="sheet wins">
             ${periodRow()}
-            <div class="scale"><span>${w.scale.weak}</span><span>${w.scale.mid}</span><span>${w.scale.strong}</span></div>
-            ${w.bars.map(b => `
-              <div class="metric">
-                <div class="lab"><span>${b.label}</span><b>${b.value}</b></div>
-                <div class="track">
-                  <i class="base"></i>
-                  <i class="fill ${b.side}" style="left:${(b.left / 358) * 100}%;width:${(b.width / 358) * 100}%"></i>
-                  <i class="tick"></i>
-                </div>
-              </div>`).join("")}
-            ${insight(w.insight)}
+            <div data-slot="wins-body">${slots["wins-body"](vm0)}</div>
+            ${insight("wins-insight", slots["wins-insight"](vm0))}
           </div></div>
-          <div class="px">${tiles(w.tiles, false)}</div>
+          <div class="px" data-slot="wins-tiles">${slots["wins-tiles"](vm0)}</div>
         </div>
       </div></div>
       ${indicator()}
@@ -1076,39 +1400,17 @@
 
   function matches() {
     const m = D.matches;
-    const monthLeft = [-8, 49, 113, 173, 236, 293];
-    const yTop = [14.5, 66.8, 119.1, 171.4];
-    const dots = [
-      [21.11, 164.4],
-      [144.22, 112.1],
-      [205.78, 190.55],
-      [267.34, 164.4],
-      [328.89, 216.7]
-    ];
     return `<section class="screen detail" data-screen="matches" hidden>
       ${status("light")}
       <div class="scroll"><div class="scroll-inner">
-        ${hero(m)}
+        ${hero({ title: m.title }, "matches", vm0)}
         <div class="detail-pad">
           <div class="px"><div class="sheet matches">
             ${periodRow()}
-            <div class="mchart">
-              <img src="assets/matches-area.svg" alt="" style="left:25.11px;top:63.8px">
-              <img src="assets/matches-grid.svg" alt="" style="left:0;top:-69px">
-              <img src="assets/matches-line.svg" alt="" style="left:24.3px;top:62.9px">
-              <i class="scrub"></i>
-              ${dots.map(([x, y]) => `<img src="assets/m-dot.svg" alt="" style="left:${x}px;top:${y}px">`).join("")}
-              <img src="assets/sel-halo.svg" alt="" style="left:72.66px;top:49.8px">
-              <img src="assets/sel-dot.svg" alt="" style="left:80.66px;top:57.8px">
-              ${m.yLabels.map((y, i) => `<p class="ylab" style="top:${yTop[i]}px">${y}</p>`).join("")}
-              <div class="tooltip"><span>${m.tooltip.month}</span><b>${m.tooltip.value}</b></div>
-            </div>
-            <div class="months">
-              ${m.months.map((month, i) => `<span class="${month.selected ? "on" : ""}" style="left:${monthLeft[i]}px">${month.label}</span>`).join("")}
-            </div>
-            ${insight(m.insight)}
+            <div data-slot="matches-chart">${slots["matches-chart"](vm0)}</div>
+            ${insight("matches-insight", slots["matches-insight"](vm0))}
           </div></div>
-          <div class="px">${tiles(m.tiles, false)}</div>
+          <div class="px" data-slot="matches-tiles">${slots["matches-tiles"](vm0)}</div>
           <div class="px" style="display:flex;flex-direction:column;gap:12px">
             <h2 class="block-title">${m.listTitle}</h2>
             ${matchRows(m.rows)}
@@ -1125,23 +1427,15 @@
     return `<section class="screen detail" data-screen="opponents" hidden>
       ${status("light")}
       <div class="scroll"><div class="scroll-inner">
-        ${hero(o)}
+        ${hero({ title: o.title, chip: periodNow().chip }, "opp", Object.assign({}, vm0))}
         <div class="detail-pad">
           <div class="px"><div class="sheet opponents">
-            <div class="groups">
-              <div class="ghead"><span class="g-name">Уровень соперника</span><span class="g-count">Побед</span><span class="g-pct">%</span></div>
-              ${o.table.map(row => `
-                <div class="grow${row.total ? " total" : ""}">
-                  <div class="g-name"><b>${row.name}</b>${row.range ? `<span>${row.range}</span>` : ""}</div>
-                  <div class="g-count">${row.count}</div>
-                  <div class="g-pct ${row.tone}">${row.percent}</div>
-                </div>`).join("")}
-            </div>
-            ${insight(o.insight)}
+            <div class="groups" data-slot="opp-table">${slots["opp-table"](vm0)}</div>
+            ${insight("opp-insight", slots["opp-insight"](vm0))}
           </div></div>
           <div class="px" style="display:flex;flex-direction:column;gap:12px">
             <h2 class="block-title">${o.listTitle}</h2>
-            ${matchRows(o.rows)}
+            <div data-slot="opp-list">${slots["opp-list"](vm0)}</div>
           </div>
         </div>
       </div></div>
@@ -1154,30 +1448,19 @@
     return `<section class="screen detail" data-screen="surface" hidden>
       ${status("light")}
       <div class="scroll"><div class="scroll-inner">
-        ${hero(s)}
+        ${hero({ title: s.title }, "surf", vm0)}
         <div class="detail-pad">
           <div class="px"><div class="sheet surface">
             ${periodRow()}
-            <div class="arcs">
-              <img src="assets/arc-track.svg" alt="" style="left:87.4px;top:-3.6px">
-              <img src="assets/arc-hard.svg" alt="" style="left:87.4px;top:-3.6px">
-              <img src="assets/arc-track-in.svg" alt="" style="left:109px;top:18px">
-              <img src="assets/arc-clay.svg" alt="" style="left:109px;top:18px">
-              <p class="val">${s.center}</p>
-              <p class="note">${s.centerNote}</p>
-              <div class="legend">
-                <i><img src="assets/dot-hard.svg" alt="">хард <b class="brand">64 %</b></i>
-                <i><img src="assets/dot-clay.svg" alt="">грунт <b class="clay">53 %</b></i>
-              </div>
-            </div>
-            ${insight(s.insight)}
+            <div class="arcs" data-slot="surf-arcs">${slots["surf-arcs"](vm0)}</div>
+            ${insight("surf-insight", slots["surf-insight"](vm0))}
           </div></div>
           <div class="px" style="display:flex;flex-direction:column;gap:12px">
             <h2 class="block-title plain">${s.listTitle}</h2>
             <div class="seg" data-surface-switch>
               ${s.chips.map(chip => `<button type="button" data-surface="${chip.id}" class="${chip.selected ? "on" : ""}">${chip.label}</button>`).join("")}
             </div>
-            <div id="surface-list">${matchRows(s.lists.hard)}</div>
+            <div id="surface-list" data-slot="surf-list">${slots["surf-list"](vm0)}</div>
           </div>
         </div>
       </div></div>
@@ -1186,6 +1469,7 @@
   }
 
   stackEl.innerHTML = home() + wins() + matches() + opponents() + surface();
+  refreshChartsDefault();
 
   const periodMenu = document.createElement("div");
   periodMenu.className = "period-menu";
@@ -1196,18 +1480,12 @@
   ).join("");
   let periodAnchor = null;
 
-  function periodCopy(period) {
-    return {
-      "home-delta": `▲ 0,4 ${period.zaShort}`,
-      "home-chart": `Динамика уровня NTRP ${period.za}`,
-      "home-insight": `Вырос на 0,4 ${period.za}, рост был почти каждый месяц`,
-      "home-win": `▲ 3 п.п. ${period.zaShort}`,
-      "home-matches": period.za,
-      "wins-caption": `побед ${period.za}`,
-      "wins-win": `59 % ${period.za}`,
-      "wins-loss": `41 % ${period.za}`,
-      "matches-caption": `матчей ${period.za}`
-    };
+  function syncMenu(id) {
+    periodMenu.querySelectorAll("[data-period]").forEach(button => {
+      const on = button.dataset.period === id;
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-checked", on ? "true" : "false");
+    });
   }
 
   function applyPeriod(id) {
@@ -1220,16 +1498,8 @@
     stackEl.querySelectorAll("[data-period-open]").forEach(node => {
       node.firstChild.textContent = period.chip;
     });
-    const copy = periodCopy(period);
-    stackEl.querySelectorAll("[data-period-copy]").forEach(node => {
-      const next = copy[node.dataset.periodCopy];
-      if (next) node.textContent = next;
-    });
-    periodMenu.querySelectorAll("[data-period]").forEach(button => {
-      const on = button.dataset.period === id;
-      button.classList.toggle("on", on);
-      button.setAttribute("aria-checked", on ? "true" : "false");
-    });
+    fillSlots(model(id));
+    syncMenu(id);
   }
 
   function closePeriodMenu() {
@@ -1244,7 +1514,7 @@
     periodMenu.hidden = false;
     periodAnchor = anchor;
     anchor.setAttribute("aria-expanded", "true");
-    applyPeriod(D.periodId);
+    syncMenu(D.periodId);
     const hostBox = host.getBoundingClientRect();
     const anchorBox = anchor.getBoundingClientRect();
     const scale = hostBox.width / host.offsetWidth;
@@ -1485,6 +1755,7 @@
     const from = screen(history[history.length - 1]);
     const to = screen(id);
     to.hidden = false;
+    refreshCharts();
     to.style.zIndex = "2";
     from.style.zIndex = "1";
     if (sourceEl) zoomFrom[id] = sourceEl;
@@ -1580,32 +1851,6 @@
     setTimeout(done, 540);
   }
 
-  function selectPoint(index) {
-    const point = D.home.months[index];
-    if (!point) return;
-    const chart = document.querySelector("[data-screen=home] .chart");
-    const halo = chart.querySelector(".halo");
-    const dot = chart.querySelector(".pdot");
-    const scrub = chart.querySelector(".scrub");
-    const tip = chart.querySelector(".tooltip");
-    halo.style.left = (point.x - 10) + "px";
-    halo.style.top = (point.y - 10) + "px";
-    dot.style.left = (point.x - 6) + "px";
-    dot.style.top = (point.y - 6) + "px";
-    scrub.style.left = (point.x - 0.5) + "px";
-    tip.querySelector("span").textContent = point.tip || point.label;
-    tip.querySelector("b").textContent = point.value;
-    const width = tip.offsetWidth;
-    tip.style.left = Math.max(8, Math.min(358 - width - 8, point.x - width / 2)) + "px";
-    tip.style.top = Math.max(8, point.y - 68) + "px";
-    chart.querySelectorAll(".mdot").forEach(node => {
-      node.classList.toggle("is-off", Number(node.dataset.dot) === index);
-    });
-    chart.parentElement.querySelectorAll(".months [data-point]").forEach(node => {
-      node.classList.toggle("on", Number(node.dataset.point) === index);
-    });
-  }
-
   stackEl.addEventListener("click", (event) => {
     const choice = event.target.closest("[data-period]");
     if (choice) {
@@ -1623,9 +1868,10 @@
       closePeriodMenu();
       return;
     }
-    const pointBtn = event.target.closest("[data-point]");
-    if (pointBtn && pointBtn.closest("[data-screen=home]")) {
-      selectPoint(Number(pointBtn.dataset.point));
+    const cp = event.target.closest("[data-cp]");
+    if (cp) {
+      const [chartId, index] = cp.dataset.cp.split(":");
+      selectPoint(chartId, Number(index));
       return;
     }
     const pushBtn = event.target.closest("[data-push]");
@@ -1637,8 +1883,7 @@
     const surfaceBtn = event.target.closest("[data-surface]");
     if (surfaceBtn) {
       stackEl.querySelectorAll("[data-surface]").forEach(btn => btn.classList.toggle("on", btn === surfaceBtn));
-      const list = D.surface.lists[surfaceBtn.dataset.surface];
-      document.getElementById("surface-list").innerHTML = matchRows(list);
+      fillSlots(model(D.periodId), "surf-list");
     }
   });
 
