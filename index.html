@@ -55,7 +55,7 @@
     padding: 12px;
     border-radius: 62px;
     background: linear-gradient(135deg, #8b8b90 0%, #323235 16%, #9a9a9f 32%, #2c2c2f 50%, #1b1b1e 68%, #6a6a6f 84%, #2a2a2d 100%);
-    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.7), 0 40px 90px rgba(0, 0, 0, 0.45), 0 14px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.7), 0 40px 80px rgba(30, 40, 120, 0.28), 0 14px 30px rgba(13, 13, 13, 0.22);
   }
   .device::before { content: ""; position: absolute; inset: 4px; border-radius: 58px; background: #050505; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05); }
   .hw { position: absolute; width: 4px; border-radius: 2px; background: linear-gradient(90deg, #4d4d52, #8d8d92 55%, #3a3a3e); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
@@ -65,11 +65,9 @@
   .hw.pwr { right: -3px; top: 232px; height: 96px; background: linear-gradient(270deg, #4d4d52, #8d8d92 55%, #3a3a3e); }
   .island { position: absolute; z-index: 40; top: 23px; left: 50%; width: 122px; height: 35px; margin-left: -61px; border-radius: 20px; background: #000; pointer-events: none; }
   .island::after { content: ""; position: absolute; right: 16px; top: 11px; width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #1d2d4a 0%, #0a1020 45%, #000 70%); box-shadow: 0 0 0 1.5px #0d0d10; }
-  .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: radial-gradient(120% 90% at 18% 12%, #5663ff 0%, #2e3dff 42%, #1a24c4 100%); }
+  .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: radial-gradient(55% 50% at 50% 54%, rgba(46, 61, 255, 0.24) 0%, rgba(46, 61, 255, 0.09) 50%, rgba(46, 61, 255, 0) 78%), #eceef5; }
   .bg svg { position: absolute; display: block; }
   .bg .court { inset: 0; width: 100%; height: 100%; }
-  .bg .ball1 { right: -70px; top: 70px; width: 260px; height: 260px; filter: drop-shadow(0 24px 30px rgba(10, 14, 90, 0.45)); }
-  .bg .ball2 { left: -50px; bottom: 90px; width: 170px; height: 170px; filter: drop-shadow(0 18px 24px rgba(10, 14, 90, 0.45)); }
   .stage { position: relative; z-index: 1; }
   .screen-clip {
     position: relative;
@@ -939,10 +937,10 @@
   .chip-on:active { background: rgba(255, 255, 255, 0.34); }
   .seg button:not(.on):active { background: rgba(13, 13, 13, 0.06); }
   /* переключатель состояния на фоне */
-  .mode { position: fixed; top: 4px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; gap: 2px; padding: 4px; border-radius: 100px; background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(8px); }
-  .mode button { height: 36px; padding: 0 18px; border-radius: 100px; font-weight: 500; font-size: 15px; line-height: 20px; color: #fff; transition: background-color 160ms ease-out, color 160ms ease-out; }
-  .mode button.on { background: #fff; color: var(--ink); }
-  .mode button:not(.on):hover { background: rgba(255, 255, 255, 0.16); }
+  .mode { position: fixed; top: 4px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; gap: 2px; padding: 4px; border-radius: 100px; background: rgba(13, 13, 13, 0.08); }
+  .mode button { height: 36px; padding: 0 18px; border-radius: 100px; font-weight: 500; font-size: 15px; line-height: 20px; color: var(--ink); transition: background-color 160ms ease-out, color 160ms ease-out; }
+  .mode button.on { background: var(--ink); color: #fff; }
+  .mode button:not(.on):hover { background: rgba(13, 13, 13, 0.06); }
   .stage { padding-top: 64px; }
   /* пустое состояние */
   .digits.dim .flap { background: linear-gradient(#c9c9c9 0 42px, #fff 41px 43px, #d5d5d5 42px 84px); }
@@ -999,14 +997,12 @@
   <button type="button" role="radio" aria-checked="false" data-mode="new">Новый игрок</button>
 </div>
 <div class="bg" aria-hidden="true">
-  <svg class="court" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="4">
+  <svg class="court" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" fill="none" stroke="#2e3dff" stroke-opacity="0.07" stroke-width="3">
     <g transform="rotate(-8 800 450)">
       <rect x="160" y="155" width="1280" height="590"/>
       <path d="M160 228.5H1440M160 671.5H1440M800 155V745M455 228.5V671.5M1145 228.5V671.5M455 450H1145"/>
     </g>
   </svg>
-  <svg class="ball1" viewBox="0 0 240 240"><defs><clipPath id="bc1"><circle cx="120" cy="120" r="120"/></clipPath></defs><g clip-path="url(#bc1)"><circle cx="120" cy="120" r="120" fill="#eaff00"/><circle cx="-50" cy="50" r="120" fill="none" stroke="#fff" stroke-width="9"/><circle cx="290" cy="190" r="120" fill="none" stroke="#fff" stroke-width="9"/></g></svg>
-  <svg class="ball2" viewBox="0 0 240 240"><defs><clipPath id="bc2"><circle cx="120" cy="120" r="120"/></clipPath></defs><g clip-path="url(#bc2)"><circle cx="120" cy="120" r="120" fill="#eaff00"/><circle cx="-50" cy="50" r="120" fill="none" stroke="#fff" stroke-width="9"/><circle cx="290" cy="190" r="120" fill="none" stroke="#fff" stroke-width="9"/></g></svg>
 </div>
 <div class="stage">
   <div>
