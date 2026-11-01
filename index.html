@@ -1062,10 +1062,10 @@
     };
   }
 
-  function model(id) {
+  function model(id, offset = D.offset) {
     const n = Number(id);
     const per = D.periods.find(p => p.id === id) || D.periods[1];
-    const end = MONTH_TOTAL - D.offset, start = end - n, off = D.offset;
+    const off = offset, end = MONTH_TOTAL - off, start = end - n;
     const labels = [];
     for (let g = start; g < end; g++) labels.push(monthAt(g).name);
     const ntrp = D.series.ntrp.slice(start, end);
@@ -1077,7 +1077,7 @@
     const winPct = pct(st.wins.w, st.wins.t);
     const barAvg = Math.round(st.bars.reduce((a, b) => a + b, 0) / st.bars.length);
     const best = st.surface.hard >= st.surface.clay ? "hard" : "clay";
-    return { id, n, per, st, labels, ntrp, cnt, total, peak, peakI, winPct, barAvg, best, start, end, avg: (Math.round(total / n * 10) / 10).toFixed(1) };
+    return { id, n, off, per, st, labels, ntrp, cnt, total, peak, peakI, winPct, barAvg, best, start, end, avg: (Math.round(total / n * 10) / 10).toFixed(1) };
   }
 
   function pickMatches(vm, filter) {
@@ -1253,7 +1253,7 @@
       steps: [0.1, 0.2, 0.5],
       text: v => v.toFixed(1),
       tick: v => v.toFixed(1),
-      tip: i => (i === vm.n - 1 && D.offset === 0 ? "Сегодня" : ""),
+      tip: i => (i === vm.n - 1 && vm.off === 0 ? "Сегодня" : ""),
       select: vm.n - 1
     }),
     "home-insight": vm => homeInsight(vm),
@@ -1367,14 +1367,16 @@
     return `<${tag || "span"} data-slot="${name}"${cls ? ` class="${cls}"` : ""}>${slots[name](vm)}</${tag || "span"}>`;
   }
 
+  /* главная всегда показывает последние 6 месяцев, период на ней не меняется */
   function fillSlots(vm, only) {
+    const homeVm = model("6", 0);
     const before = only ? null : numberEls().map(el => el.textContent);
     const oldPts = {};
     Object.keys(charts).forEach(id => { oldPts[id] = charts[id].pts; });
     stackEl.querySelectorAll("[data-slot]").forEach(node => {
       if (only && node.dataset.slot !== only) return;
       const fn = slots[node.dataset.slot];
-      if (fn) node.innerHTML = fn(vm);
+      if (fn) node.innerHTML = fn(node.dataset.slot.startsWith("home-") ? homeVm : vm);
     });
     refreshChartsDefault();
     if (before) animateUpdate(before, oldPts);
@@ -1550,7 +1552,7 @@
     </div>`;
   }
 
-  const vm0 = model(D.periodId);
+  const vm0 = model("6", 0);
 
   function home() {
     const h = D.home;
