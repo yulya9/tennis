@@ -79,7 +79,8 @@
     background: var(--bg);
   }
   .stack { position: absolute; inset: 0; }
-  .scroll-inner { contain: layout style; will-change: transform; }
+  .scroll-inner { contain: layout style; }
+  .scroll { overscroll-behavior: contain; }
   .screen {
     position: absolute;
     inset: 0;
@@ -2180,6 +2181,7 @@
       const paint = () => {
         over = Math.max(-MAX_OVER, Math.min(MAX_OVER, over));
         inner.style.transition = "none";
+        inner.style.willChange = over ? "transform" : "";
         inner.style.transform = over ? `translate3d(0, ${resist(over)}px, 0)` : "";
       };
       const springBack = () => {
@@ -2346,23 +2348,24 @@
       const syncScroll = () => { if (!syncRaf) syncRaf = requestAnimationFrame(syncNow); };
       scroller.addEventListener("scroll", syncScroll, { passive: true });
 
+      /* слушатель пассивный: обычная прокрутка колесом идёт нативно, без ожидания скрипта.
+         Скрипт только рисует резиновое оттягивание, когда уже упёрлись в край */
       scroller.addEventListener("wheel", (event) => {
         if (reduce || dragging || finger) return;
-        stopGlide();
-        { const t = performance.now(); if (!dims || t - (scroller._wt || 0) > 200) measure(); scroller._wt = t; }
-        if (scroller._cool && performance.now() < scroller._cool) { event.preventDefault(); return; }
-        const atTop = scroller.scrollTop <= 0;
-        const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+        const now = performance.now();
+        if (!dims || now - (scroller._wt || 0) > 200) measure();
+        scroller._wt = now;
+        if (scroller._cool && now < scroller._cool) return;
+        const top = scroller.scrollTop;
+        const atTop = top <= 0;
+        const atBottom = top >= dims.max - 1;
         const pulling = (atTop && event.deltaY < 0) || (atBottom && event.deltaY > 0) || over;
-        if (!pulling) {
-          if (over) springBack();
-          return;
-        }
-        event.preventDefault();
+        if (!pulling) return;
+        stopGlide();
         applyDelta(-event.deltaY / screenScale());
         clearTimeout(scroller._spring);
         scroller._spring = setTimeout(() => { springBack(); scroller._cool = performance.now() + 450; }, 80);
-      }, { passive: false });
+      }, { passive: true });
     });
   }
   bindBounce(stackEl);
