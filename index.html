@@ -17,8 +17,8 @@
     --panel: #fff;
     --cobalt: #2e3dff;
     --cobalt-line: #2f3dff;
-    --flap-top: #1348ff;
-    --flap-bottom: #0836d7;
+    --flap-top: #0d0d0d;
+    --flap-bottom: #242424;
     --lime: #eaff00;
     --success: #00754e;
     --success-surface: #c7f0e2;
@@ -183,6 +183,25 @@
     line-height: 41px;
   }
   .px { padding-left: 16px; padding-right: 16px; }
+
+  .home-head { display: flex; align-items: center; justify-content: space-between; padding-right: 16px; }
+  .home-head .large-title { padding-right: 0; }
+  .avatar-btn { width: 48px; height: 48px; border-radius: 50%; overflow: hidden; flex: none; transition: transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+  .avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .avatar-btn:active { transform: scale(0.92); }
+  .chart .mdot { position: absolute; width: 8px; height: 8px; }
+  .chart .tooltip span { display: none; }
+  .is-home .panel { background: var(--cobalt); padding-bottom: 20px; }
+  .panel .chart-caption { color: rgba(255, 255, 255, 0.82); }
+  .panel .chart .ylab { color: rgba(255, 255, 255, 0.82); }
+  .panel .chart .scrub { background: rgba(255, 255, 255, 0.3); }
+  .panel .months span, .panel .months button { color: rgba(255, 255, 255, 0.75); }
+  .panel .months button.on { color: var(--lime); }
+  .panel .insight { background: #fff; }
+  .panel .insight .mark { background: var(--lime); }
+  .tile .tile-head .bubble { background: #f2f2f2; }
+  .tile .tile-head .bubble img { filter: brightness(0); }
+  .detail-pad { padding-top: 20px; }
 
   .player {
     width: 100%;
@@ -979,18 +998,14 @@
       </div>
       <div class="scroll"><div class="scroll-inner">
         <div class="home-pad">
-        <h1 class="large-title">${h.title}</h1>
-        <div class="px">
-          <button class="player" type="button">
-            <img class="avatar" src="${D.player.avatar}" alt="">
-            <span class="who"><span class="name">${D.player.name}</span><span class="city">${D.player.city}</span></span>
-            <img src="assets/chevron.svg" width="24" height="24" alt="">
-          </button>
+        <div class="home-head">
+          <h1 class="large-title">${h.title}</h1>
+          <button class="avatar-btn" type="button" aria-label="${D.player.name}, ${D.player.city}"><img src="${D.player.avatar}" alt=""></button>
         </div>
         <div class="px hero-level">
           <div class="digits">
             <div class="flap"><span>${h.digits[0]}</span><i class="l"></i><i class="r"></i></div>
-            <img class="decimal" src="assets/decimal.svg" alt="">
+            <img class="decimal" src="assets/decimal.svg?v=3" alt="">
             <div class="flap"><span>${h.digits[1]}</span><i class="l"></i><i class="r"></i></div>
           </div>
           <div class="level-info">
@@ -1002,13 +1017,13 @@
           <div class="panel">
             <p class="chart-caption" data-period-copy="${h.chartCopy}">${h.chartTitle}</p>
             <div class="chart">
-              <img class="area" src="assets/area.svg" alt="">
-              <img class="grid" src="assets/grid.svg" alt="">
-              <img class="line" src="assets/line.svg" alt="">
-              ${h.months.map((m, i) => `<img class="mdot${m.selected ? " is-off" : ""}" data-dot="${i}" style="left:${m.x - 4}px;top:${m.y - 4}px" src="assets/month-dot.svg" alt="">`).join("")}
+              <img class="area" src="assets/area.svg?v=3" alt="">
+              <img class="grid" src="assets/grid.svg?v=3" alt="">
+              <img class="line" src="assets/line.svg?v=3" alt="">
+              ${h.months.map((m, i) => `<img class="mdot${m.selected ? " is-off" : ""}" data-dot="${i}" style="left:${m.x - 4}px;top:${m.y - 4}px" src="assets/month-dot.svg?v=3" alt="">`).join("")}
               <i class="scrub"></i>
-              <img class="halo" src="assets/peak-halo.svg" alt="">
-              <img class="pdot" src="assets/peak-dot.svg" alt="">
+              <img class="halo" src="assets/peak-halo.svg?v=3" alt="">
+              <img class="pdot" src="assets/peak-dot.svg?v=3" alt="">
               ${h.yLabels.map((y, i) => `<p class="ylab" style="top:${34.5 + i * 52.3}px">${y}</p>`).join("")}
               <div class="tooltip"><span>${h.tooltip.month}</span><b>${h.tooltip.value}</b></div>
               ${h.months.map((m, i) => `<button class="hit" type="button" data-point="${i}" style="left:${m.x}px;top:${m.y}px" aria-label="${m.tip || m.label} ${m.value}"></button>`).join("")}
