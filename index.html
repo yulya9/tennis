@@ -65,6 +65,7 @@
     background: var(--bg);
   }
   .stack { position: absolute; inset: 0; }
+  .scroll-inner { contain: layout style; will-change: transform; }
   .screen {
     position: absolute;
     inset: 0;
@@ -1444,6 +1445,7 @@
       if (fn) node.innerHTML = fn(node.dataset.slot.startsWith("home-") ? homeVm : vm);
     });
     refreshChartsDefault();
+    window.dispatchEvent(new Event("resize"));
     if (before) animateUpdate(before, oldPts);
   }
 
@@ -2011,6 +2013,7 @@
     });
     history.length = 0;
     history.push(target);
+    window.dispatchEvent(new Event("resize"));
     lock = false;
     if (mode === "new") resetEmpty();
     else { refreshCharts(); playIn(screen("home"), 0); }
@@ -2122,16 +2125,25 @@
       let over = 0;
       let raf = 0;
       let finger = null;
-      const maxTop = () => Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      /* размеры читаем один раз за жест, а не на каждое движение: так нет принудительной раскладки */
+      let dims = null;
+      const measure = () => {
+        const w = clipBox.getBoundingClientRect().width;
+        dims = {
+          ch: scroller.clientHeight,
+          sh: scroller.scrollHeight,
+          max: Math.max(0, scroller.scrollHeight - scroller.clientHeight),
+          scale: w > 0 ? w / 390 : 1
+        };
+      };
+      const maxTop = () => (dims || (measure(), dims)).max;
+      window.addEventListener("resize", () => { dims = null; });
       const resist = (px) => {
         const sign = Math.sign(px);
         const x = Math.abs(px);
         return sign * (1 - 1 / (x / 140 + 1)) * 140;
       };
-      const screenScale = () => {
-        const width = clipBox.getBoundingClientRect().width;
-        return width > 0 ? width / 390 : 1;
-      };
+      const screenScale = () => (dims || (measure(), dims)).scale;
       const MAX_OVER = 300;
       const paint = () => {
         over = Math.max(-MAX_OVER, Math.min(MAX_OVER, over));
@@ -2205,6 +2217,7 @@
         if (history.length > 1 && x <= 28) return;
         event.preventDefault();
         stopGlide();
+        measure();
         if (over) springBack();
         finger = {
           id: event.pointerId,
@@ -2268,31 +2281,43 @@
       const navSlot = topbar && topbar.querySelector(".nav-slot");
       const largeTitle = scroller.querySelector(".large-title");
       const onHome = Boolean(scroller.closest(".is-home"));
-      const syncScroll = () => {
+      let syncRaf = 0, lastScrolled = null, lastNav = "", lastTitle = "", lastThumb = "", thumbOn = false;
+      const syncNow = () => {
+        syncRaf = 0;
         const y = scroller.scrollTop;
-        const max = maxTop();
+        if (!dims) measure();
+        const max = dims.max;
         if (topbar) {
           const scrolled = y > 1;
-          if (topbar.classList.contains("is-scrolled") !== scrolled) topbar.classList.toggle("is-scrolled", scrolled);
-          if (navSlot) navSlot.style.opacity = reduce ? (y > 24 ? "1" : "0") : String(Math.max(0, Math.min(1, (y - 12) / 20)));
-          if (largeTitle) largeTitle.style.opacity = reduce ? "1" : String(1 - Math.min(1, y / 16));
+          if (scrolled !== lastScrolled) { lastScrolled = scrolled; topbar.classList.toggle("is-scrolled", scrolled); }
+          if (navSlot) {
+            const v = reduce ? (y > 24 ? "1" : "0") : String(Math.max(0, Math.min(1, (y - 12) / 20)));
+            if (v !== lastNav) { lastNav = v; navSlot.style.opacity = v; }
+          }
+          if (largeTitle) {
+            const v = reduce ? "1" : String(1 - Math.min(1, y / 16));
+            if (v !== lastTitle) { lastTitle = v; largeTitle.style.opacity = v; }
+          }
         }
         if (max <= 1) return;
         const bottomGap = onHome ? 130 : 24;
-        const track = Math.max(48, scroller.clientHeight - 70 - bottomGap);
-        const size = Math.max(32, track * (scroller.clientHeight / scroller.scrollHeight));
+        const track = Math.max(48, dims.ch - 70 - bottomGap);
+        const size = Math.max(32, track * (dims.ch / dims.sh));
         const travel = Math.max(1, track - size);
-        thumb.style.height = size + "px";
-        thumb.style.transform = `translate3d(0, ${(y / max) * travel}px, 0)`;
-        thumb.classList.add("on");
+        const tf = `translate3d(0, ${((y / max) * travel).toFixed(1)}px, 0)`;
+        if (thumb._h !== size) { thumb._h = size; thumb.style.height = size + "px"; }
+        if (tf !== lastThumb) { lastThumb = tf; thumb.style.transform = tf; }
+        if (!thumbOn) { thumbOn = true; thumb.classList.add("on"); }
         clearTimeout(hideThumb);
-        hideThumb = setTimeout(() => thumb.classList.remove("on"), 450);
+        hideThumb = setTimeout(() => { thumbOn = false; thumb.classList.remove("on"); }, 450);
       };
+      const syncScroll = () => { if (!syncRaf) syncRaf = requestAnimationFrame(syncNow); };
       scroller.addEventListener("scroll", syncScroll, { passive: true });
 
       scroller.addEventListener("wheel", (event) => {
         if (reduce || dragging || finger) return;
         stopGlide();
+        { const t = performance.now(); if (!dims || t - (scroller._wt || 0) > 200) measure(); scroller._wt = t; }
         if (scroller._cool && performance.now() < scroller._cool) { event.preventDefault(); return; }
         const atTop = scroller.scrollTop <= 0;
         const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
@@ -2342,6 +2367,7 @@
     const from = screen(history[history.length - 1]);
     const to = screen(id);
     to.hidden = false;
+    window.dispatchEvent(new Event("resize"));
     refreshCharts();
     playIn(to, 220);
     to.style.zIndex = "2";
