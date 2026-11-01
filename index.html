@@ -1837,14 +1837,20 @@
   const dvalEl = sheetLayer.querySelector("#dval");
   const dsubEl = sheetLayer.querySelector("#dsub");
 
+  /* точки и ползунок создаются один раз, дальше меняются только цвет и положение */
+  dialSvg.innerHTML = DOTS.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.5" fill="rgba(13,13,13,0.13)"/>`).join("") +
+    `<g id="hdl"><circle r="24" fill="rgba(234,255,0,0.35)"/><circle r="17" fill="#33361c"/><circle r="6" fill="#eaff00"/></g>`;
+  const dotEls = Array.from(dialSvg.querySelectorAll("circle")).slice(0, DOTS.length);
+  const dotOn = new Array(DOTS.length).fill(false);
+  const hdlEl = dialSvg.querySelector("#hdl");
+
   function drawDial(angle) {
-    let out = "";
-    DOTS.forEach(([x, y, a]) => {
-      out += `<circle cx="${x}" cy="${y}" r="3.5" fill="${a <= angle + 0.5 ? "#2f3dff" : "rgba(13,13,13,0.13)"}"/>`;
-    });
+    for (let i = 0; i < DOTS.length; i++) {
+      const on = DOTS[i][2] <= angle + 0.5;
+      if (on !== dotOn[i]) { dotOn[i] = on; dotEls[i].setAttribute("fill", on ? "#2f3dff" : "rgba(13,13,13,0.13)"); }
+    }
     const [hx, hy] = polar(angle, DIAL.ring);
-    out += `<g style="filter:drop-shadow(0 0 7px rgba(234,255,0,0.9))"><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="17" fill="#33361c" stroke="#33361c" stroke-width="1.5"/><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="6" fill="#eaff00"/></g>`;
-    dialSvg.innerHTML = out;
+    hdlEl.setAttribute("transform", `translate(${hx.toFixed(1)} ${hy.toFixed(1)})`);
   }
   function placeLabels(idx) {
     sheetLayer.querySelectorAll("[data-lab]").forEach(n => {
@@ -1857,9 +1863,7 @@
   }
 
   let dialRaf = 0;
-  function goLevel(idx, instant) {
-    idx = Math.max(0, Math.min(P.steps.length - 1, idx));
-    const changed = idx !== level.idx;
+  function showLevel(idx, animateText) {
     level.idx = idx;
     const s = P.steps[idx];
     dvalEl.textContent = s.v;
@@ -1871,38 +1875,68 @@
     dialEl.setAttribute("aria-valuetext", `${s.v}, ${s.name}`);
     sheetLayer.querySelector('[data-step="-1"]').disabled = idx === 0;
     sheetLayer.querySelector('[data-step="1"]').disabled = idx === P.steps.length - 1;
-    const target = stepAngle(idx);
+    if (animateText && !reduce) dvalEl.animate([{ transform: "scale(0.94)" }, { transform: "scale(1)" }], { duration: 160, easing: EASE });
+  }
+  function tweenTo(target, dur) {
     cancelAnimationFrame(dialRaf);
-    if (instant || reduce) { level.shown = target; drawDial(target); return; }
-    if (changed) {
-      dvalEl.animate([{ transform: "scale(0.92)", opacity: 0.4 }, { transform: "scale(1)", opacity: 1 }], { duration: 220, easing: EASE });
-      sheetLayer.querySelector(".level-desc").animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 240, easing: "ease-out" });
-    }
+    if (reduce || !dur) { level.shown = target; drawDial(target); return; }
     const from = level.shown, t0 = performance.now();
     const frame = now => {
-      const p = Math.min(1, (now - t0) / 240), e = 1 - Math.pow(1 - p, 3);
+      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
       level.shown = from + (target - from) * e;
       drawDial(level.shown);
       if (p < 1) dialRaf = requestAnimationFrame(frame);
     };
     dialRaf = requestAnimationFrame(frame);
   }
+  function goLevel(idx, instant) {
+    idx = Math.max(0, Math.min(P.steps.length - 1, idx));
+    const changed = idx !== level.idx;
+    showLevel(idx, changed && !instant);
+    tweenTo(stepAngle(idx), instant ? 0 : 220);
+  }
 
-  function idxFromPointer(ev) {
+  function angleFromPointer(ev) {
     const box = dialEl.getBoundingClientRect();
     const k = box.width / 326;
     const x = (ev.clientX - box.left) / k - DIAL.cx, y = (ev.clientY - box.top) / k - DIAL.cy;
     let a = Math.atan2(y, x) * 180 / Math.PI;
     if (a < 0) a += 360;
-    /* нижняя половина: ближайший край дуги */
     if (a < 180) a = a < 90 ? 360 : 180;
-    return Math.round((a - DIAL.a0) / DIAL.step);
+    return a;
   }
-  let dialDrag = false;
-  dialEl.addEventListener("pointerdown", ev => { dialDrag = true; dialEl.setPointerCapture(ev.pointerId); goLevel(idxFromPointer(ev)); });
-  dialEl.addEventListener("pointermove", ev => { if (dialDrag) goLevel(idxFromPointer(ev)); });
-  dialEl.addEventListener("pointerup", () => { dialDrag = false; });
-  dialEl.addEventListener("pointercancel", () => { dialDrag = false; });
+  /* при перетаскивании ползунок идёт за пальцем, на ступень встаёт после отпускания */
+  let dialDrag = false, pendingAngle = null, dragRaf = 0;
+  const applyDrag = () => {
+    dragRaf = 0;
+    if (pendingAngle == null) return;
+    const a = pendingAngle; pendingAngle = null;
+    const idx = Math.max(0, Math.min(P.steps.length - 1, Math.round((a - DIAL.a0) / DIAL.step)));
+    if (idx !== level.idx) showLevel(idx, true);
+    level.shown = a;
+    drawDial(a);
+  };
+  dialEl.addEventListener("pointerdown", ev => {
+    dialDrag = true;
+    dialEl.setPointerCapture(ev.pointerId);
+    cancelAnimationFrame(dialRaf);
+    pendingAngle = angleFromPointer(ev);
+    applyDrag();
+  });
+  dialEl.addEventListener("pointermove", ev => {
+    if (!dialDrag) return;
+    pendingAngle = angleFromPointer(ev);
+    if (!dragRaf) dragRaf = requestAnimationFrame(applyDrag);
+  });
+  const endDialDrag = () => {
+    if (!dialDrag) return;
+    dialDrag = false;
+    cancelAnimationFrame(dragRaf); dragRaf = 0;
+    if (pendingAngle != null) applyDrag();
+    tweenTo(stepAngle(level.idx), 180);
+  };
+  dialEl.addEventListener("pointerup", endDialDrag);
+  dialEl.addEventListener("pointercancel", endDialDrag);
   dialEl.addEventListener("keydown", ev => {
     const k = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[ev.key];
     if (k) { ev.preventDefault(); goLevel(level.idx + k); }
@@ -2098,7 +2132,9 @@
         const width = clipBox.getBoundingClientRect().width;
         return width > 0 ? width / 390 : 1;
       };
+      const MAX_OVER = 300;
       const paint = () => {
+        over = Math.max(-MAX_OVER, Math.min(MAX_OVER, over));
         inner.style.transition = "none";
         inner.style.transform = over ? `translate3d(0, ${resist(over)}px, 0)` : "";
       };
@@ -2257,6 +2293,7 @@
       scroller.addEventListener("wheel", (event) => {
         if (reduce || dragging || finger) return;
         stopGlide();
+        if (scroller._cool && performance.now() < scroller._cool) { event.preventDefault(); return; }
         const atTop = scroller.scrollTop <= 0;
         const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
         const pulling = (atTop && event.deltaY < 0) || (atBottom && event.deltaY > 0) || over;
@@ -2267,7 +2304,7 @@
         event.preventDefault();
         applyDelta(-event.deltaY / screenScale());
         clearTimeout(scroller._spring);
-        scroller._spring = setTimeout(springBack, 80);
+        scroller._spring = setTimeout(() => { springBack(); scroller._cool = performance.now() + 450; }, 80);
       }, { passive: false });
     });
   }
