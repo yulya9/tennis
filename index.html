@@ -2032,6 +2032,34 @@
     setFlaps(["0", "0"], false);
   }
 
+  /* ---------- типографика: неразрывные пробелы, чтобы не висели предлоги ---------- */
+  const NB = "\u00A0";
+  const reShort = /(^|[\s(«„"])(в|во|к|ко|с|со|у|о|об|обо|от|до|по|на|за|из|изо|без|для|над|под|при|про|и|а|но|да|не|ни|же|ли|бы)\s+/giu;
+  function typo(str) {
+    let out = str.replace(/(\d)\s+(?=[%А-Яа-яЁёA-Za-z])/g, "$1" + NB);
+    out = out.replace(/([А-Яа-яЁё]{3})\s+(\d{4})/g, "$1" + NB + "$2");
+    out = out.replace(/\s+([–—])/g, NB + "$1");
+    out = out.replace(reShort, "$1$2" + NB).replace(reShort, "$1$2" + NB);
+    return out;
+  }
+  function typoNode(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => /^(SCRIPT|STYLE)$/.test(n.parentNode.nodeName) || !n.nodeValue.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+    });
+    const list = [];
+    while (walker.nextNode()) list.push(walker.currentNode);
+    list.forEach(n => { const v = typo(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v; });
+  }
+  const typoObserver = new MutationObserver(muts => {
+    muts.forEach(m => {
+      if (m.type === "characterData") {
+        const v = typo(m.target.nodeValue);
+        if (v !== m.target.nodeValue) m.target.nodeValue = v;
+      } else {
+        m.addedNodes.forEach(n => { if (n.nodeType === 3) { const v = typo(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v; } else if (n.nodeType === 1) typoNode(n); });
+      }
+    });
+  });
   D.mode = "data";
   function setMode(mode) {
     if (mode === D.mode) return;
@@ -2664,6 +2692,10 @@
   clip.addEventListener("pointerup", endDrag);
   clip.addEventListener("pointercancel", endDrag);
 
+  [stackEl, sheetLayer, periodMenu, document.querySelector(".mode")].forEach(el => {
+    typoNode(el);
+    typoObserver.observe(el, { childList: true, subtree: true, characterData: true });
+  });
   screen("home").hidden = false;
 })();
 </script>
