@@ -67,7 +67,6 @@
   .island::after { content: ""; position: absolute; right: 16px; top: 11px; width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #1d2d4a 0%, #0a1020 45%, #000 70%); box-shadow: 0 0 0 1.5px #0d0d10; }
   .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; transition: background 300ms; }
   .bg svg { position: absolute; display: block; }
-  .bg .court { inset: 0; width: 100%; height: 100%; }
   .stage { position: relative; z-index: 1; }
   .screen-clip {
     position: relative;
@@ -1004,7 +1003,6 @@
   /* фон: мягкий корт */
   body { --mode-bg: rgba(13, 13, 13, 0.07); --mode-fg: #0d0d0d; --mode-on-bg: #0d0d0d; --mode-on-fg: #fff; --mode-hover: rgba(13, 13, 13, 0.06); }
   .bg { background: radial-gradient(85% 75% at 50% 44%, #eef0ff 0%, #dde1ff 55%, #cdd3fb 100%); }
-  .bg .court { stroke: #fff; stroke-opacity: 0.85; }
   .mode { background: var(--mode-bg); }
   .mode button { color: var(--mode-fg); }
   .mode button.on { background: var(--mode-on-bg); color: var(--mode-on-fg); }
@@ -1017,12 +1015,6 @@
   <button type="button" role="radio" aria-checked="false" data-mode="new">Новый игрок</button>
 </div>
 <div class="bg" aria-hidden="true">
-  <svg class="court" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" fill="none" stroke="#2e3dff" stroke-opacity="0.07" stroke-width="3">
-    <g transform="rotate(-8 800 450)">
-      <rect x="160" y="155" width="1280" height="590"/>
-      <path d="M160 228.5H1440M160 671.5H1440M800 155V745M455 228.5V671.5M1145 228.5V671.5M455 450H1145"/>
-    </g>
-  </svg>
 </div>
 <div class="stage">
   <div>
