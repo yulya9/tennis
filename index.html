@@ -2279,15 +2279,27 @@
         const now = performance.now();
         const dt = Math.max(1, now - finger.t);
         const dy = (event.clientY - finger.lastY) / screenScale();
-        finger.v = dy / dt;
+        finger.v = finger.v * 0.6 + (dy / dt) * 0.4;
         finger.lastY = event.clientY;
         finger.t = now;
-        applyDelta(dy);
+        /* движения копим и применяем раз за кадр, чтобы не дёргать прокрутку по несколько раз */
+        finger.pending = (finger.pending || 0) + dy;
+        if (!finger.raf) {
+          const f = finger;
+          f.raf = requestAnimationFrame(() => {
+            f.raf = 0;
+            const d = f.pending || 0;
+            f.pending = 0;
+            if (d) applyDelta(d);
+          });
+        }
       });
       const endFinger = (event) => {
         if (!finger || event.pointerId !== finger.id) return;
         const moved = finger.moved;
         const vel = finger.v;
+        cancelAnimationFrame(finger.raf);
+        if (finger.pending) applyDelta(finger.pending);
         finger = null;
         scroller.classList.remove("is-dragging");
         if (!moved) return;
